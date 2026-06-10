@@ -1,0 +1,22 @@
+INSERT INTO sources (id, name, country, feed_url, tab_affinity, active)
+VALUES
+  ('reuters-world',    'Reuters World',          'GLOBAL', 'https://news.google.com/rss/search?q=world+news+site:reuters.com&hl=en-US&gl=US&ceid=US:en',        'geopolitics', true),
+  ('bbc-world',        'BBC World News',          'GLOBAL', 'https://feeds.bbci.co.uk/news/world/rss.xml',                                                        'geopolitics', true),
+  ('aljazeera',        'Al Jazeera English',      'GLOBAL', 'https://www.aljazeera.com/xml/rss/all.xml',                                                          'geopolitics', true),
+  ('reuters-top',      'Reuters Top News',        'GLOBAL', 'https://news.google.com/rss/search?q=top+news+site:reuters.com&hl=en-US&gl=US&ceid=US:en',          'top_stories', true),
+  ('bbc-top',          'BBC Top Stories',         'GLOBAL', 'https://feeds.bbci.co.uk/news/rss.xml',                                                             'top_stories', true),
+  ('ap-top',           'AP News Top Stories',     'GLOBAL', 'https://news.google.com/rss/search?q=breaking+news+site:apnews.com&hl=en-US&gl=US&ceid=US:en',     'top_stories', true),
+  ('reuters-business', 'Reuters Business',        'GLOBAL', 'https://news.google.com/rss/search?q=reuters+markets+economy+earnings&hl=en-US&gl=US&ceid=US:en',  'finance',     true),
+  ('cnbc-top',         'CNBC Top News',           'GLOBAL', 'https://www.cnbc.com/id/100003114/device/rss/rss.html',                                             'finance',     true),
+  ('ft-world',         'Financial Times',         'GLOBAL', 'https://www.ft.com/rss/home/uk',                                                                    'finance',     true),
+  ('mit-tech',         'MIT Technology Review',   'GLOBAL', 'https://www.technologyreview.com/feed/',                                                            'ai_tech',     true),
+  ('ars-tech',         'Ars Technica',            'GLOBAL', 'https://feeds.arstechnica.com/arstechnica/technology-lab',                                          'ai_tech',     true),
+  ('wired-ai',         'Wired',                   'GLOBAL', 'https://www.wired.com/feed/rss',                                                                    'ai_tech',     true),
+  ('bbc-sport',        'BBC Sport',               'GLOBAL', 'https://feeds.bbci.co.uk/sport/rss.xml',                                                            'sports_ent',  true),
+  ('espn',             'ESPN',                    'GLOBAL', 'https://www.espn.com/espn/rss/news',                                                                'sports_ent',  true),
+  ('variety',          'Variety',                 'GLOBAL', 'https://variety.com/feed/',                                                                         'sports_ent',  true),
+  ('abc-au',           'ABC News Australia',      'AU',     'https://www.abc.net.au/news/feed/51120/rss.xml',                                                    'australia',   true),
+  ('guardian-au',      'The Guardian Australia',  'AU',     'https://www.theguardian.com/australia-news/rss',                                                    'australia',   true),
+  ('smh',              'Sydney Morning Herald',   'AU',     'https://www.smh.com.au/rss/feed.xml',                                                               'australia',   true),
+  ('sbs',              'SBS News',                'AU',     'https://www.sbs.com.au/news/feed',                                                                  'australia',   true),
+  ('tavily',           'Tavily',                  'GLOBAL', NULL,                                                                                                NULL,          true);

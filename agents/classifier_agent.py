@@ -1,0 +1,129 @@
+import os
+import json
+import anthropic
+from dotenv import load_dotenv
+from ingester.budget_guard import record_usage, is_within_budget
+
+load_dotenv()
+
+client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+
+SYSTEM_PROMPT_PATH = os.path.join(
+    os.path.dirname(__file__), 'prompts', 'classifier_system.txt'
+)
+
+with open(SYSTEM_PROMPT_PATH, 'r', encoding='utf-8') as f:
+    SYSTEM_PROMPT = f.read()
+
+
+def classify_article(structured_input: str) -> dict:
+    """
+    Send a preprocessed article to Claude Haiku for classification.
+    Uses prompt caching on the system prompt to reduce token costs.
+
+    Returns a dict with:
+        tab, summary, is_noise, is_australia, is_nsw
+    """
+    if not is_within_budget('haiku'):
+        print("BUDGET GUARD: Skipping classification — daily limit reached")
+        return {
+            'tab': 'top_stories',
+            'summary': '',
+            'is_noise': True,
+            'is_australia': False,
+            'is_nsw': False
+        }
+
+    try:
+        response = client.messages.create(
+            model='claude-haiku-4-5',
+            max_tokens=256,
+            system=[
+                {
+                    'type': 'text',
+                    'text': SYSTEM_PROMPT,
+                    'cache_control': {'type': 'ephemeral'}
+                }
+            ],
+            messages=[
+                {
+                    'role': 'user',
+                    'content': structured_input
+                }
+            ]
+        )
+
+        # Record token usage for budget tracking
+        usage = response.usage
+        input_tokens = usage.input_tokens
+        output_tokens = usage.output_tokens
+        record_usage('haiku', input_tokens, output_tokens)
+
+        # Parse JSON response
+        raw = response.content[0].text.strip()
+        # Strip markdown code fences if Haiku adds them
+        if raw.startswith('```'):
+            raw = raw.split('```')[1]
+            if raw.startswith('json'):
+                raw = raw[4:]
+        raw = raw.strip()
+        result = json.loads(raw)
+
+        # Validate required fields
+        valid_tabs = [
+            'geopolitics', 'top_stories', 'finance',
+            'ai_tech', 'sports_ent', 'australia'
+        ]
+        if result.get('tab') not in valid_tabs:
+            result['tab'] = 'top_stories'
+
+        return {
+            'tab':          result.get('tab', 'top_stories'),
+            'summary':      result.get('summary', ''),
+            'is_noise':     result.get('is_noise', False),
+            'is_australia': result.get('is_australia', False),
+            'is_nsw':       result.get('is_nsw', False)
+        }
+
+    except json.JSONDecodeError as e:
+        print(f"Haiku JSON parse error: {e}")
+        return {
+            'tab': 'top_stories',
+            'summary': '',
+            'is_noise': True,
+            'is_australia': False,
+            'is_nsw': False
+        }
+    except Exception as e:
+        print(f"Haiku classification error: {e}")
+        return {
+            'tab': 'top_stories',
+            'summary': '',
+            'is_noise': True,
+            'is_australia': False,
+            'is_nsw': False
+        }
+
+
+def classify_batch(articles: list) -> list:
+    """
+    Classify a list of preprocessed articles.
+    Each article dict must have a 'structured_input' key
+    from preprocessor.preprocess_article().
+
+    Returns the same list with classification fields added.
+    """
+    results = []
+    for i, article in enumerate(articles):
+        print(f"Classifying {i+1}/{len(articles)}: {article.get('title', '')[:60]}")
+        classification = classify_article(article['structured_input'])
+
+        if classification['is_noise']:
+            print(f"  → NOISE — skipping")
+            continue
+
+        article.update(classification)
+        results.append(article)
+        print(f"  → {classification['tab']} | {classification['summary'][:60]}")
+
+    return results
