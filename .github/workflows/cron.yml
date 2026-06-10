@@ -2,12 +2,9 @@ name: News Hub Cron Job
 
 on:
   schedule:
-    # 7am AEST = 9pm UTC previous day
     - cron: '0 21 * * *'
-    # 6pm AEST = 8am UTC same day
     - cron: '0 8 * * *'
   workflow_dispatch:
-    # Allows manual trigger from GitHub Actions tab
 
 jobs:
   run-cron:
@@ -31,9 +28,10 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl"
+        run: pip install -r requirements.txt
+
+      - name: Install spacy model
+        run: python -m pip install en_core_web_sm --find-links https://github.com/explosion/spacy-models/releases/expanded_assets/en_core_web_sm-3.7.1
 
       - name: Run cron job
         env:
@@ -41,6 +39,5 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-        run: |
-          python -m ingester.cron
+          TAVILY_KEY: ${{ secrets.TAVILY_API_KEY }}
+        run: python -m ingester.cron
