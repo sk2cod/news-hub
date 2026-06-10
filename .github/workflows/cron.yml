@@ -28,7 +28,9 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install httpx==0.24.1 gotrue==2.4.2 --force-reinstall
 
       - name: Install spacy model
         run: python -m pip install en_core_web_sm --find-links https://github.com/explosion/spacy-models/releases/expanded_assets/en_core_web_sm-3.7.1
@@ -39,5 +41,5 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          TAVILY_KEY: ${{ secrets.TAVILY_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: python -m ingester.cron
