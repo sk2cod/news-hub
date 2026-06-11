@@ -8,47 +8,12 @@ load_dotenv()
 
 client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
 
-ANALYSIS_SYSTEM_PROMPT = """
-You are a senior investigative journalist and editorial analyst.
-Your job is to provide deep, balanced analysis of a news article.
+ANALYSIS_PROMPT_PATH = os.path.join(
+    os.path.dirname(__file__), 'prompts', 'analysis_system.txt'
+)
 
-## YOUR ANALYSIS MUST INCLUDE
-
-1. SENTIMENT — Overall tone of the news event itself (not the article's writing style).
-   Choose exactly one: positive, negative, neutral, mixed
-
-2. BIAS SCORE — Rate the article's editorial bias on a scale of -5 to +5.
-   -5 = strongly left-leaning
-    0 = neutral/centrist
-   +5 = strongly right-leaning
-   Base this on word choice, framing, and what is omitted.
-
-3. BIAS DIRECTION — One short phrase describing the bias if score is not 0.
-   Examples: "pro-government", "anti-corporate", "Western-centric", "neutral"
-
-4. CONTEXT SUMMARY — 2-3 paragraphs providing:
-   - What led to this event (background)
-   - Why it matters (significance)
-   - What happens next (implications)
-
-5. KEY ENTITIES — List the most important people, organisations, and places
-   mentioned. Comma separated.
-
-## RULES
-- Be factual and balanced.
-- Do not insert your own political opinion.
-- If the article lacks enough information for deep analysis, say so clearly
-  in the context summary.
-- Respond ONLY with a valid JSON object. No preamble, no markdown.
-
-{
-  "sentiment": "positive|negative|neutral|mixed",
-  "bias_score": 0,
-  "bias_direction": "neutral",
-  "context_summary": "paragraph 1\n\nparagraph 2\n\nparagraph 3",
-  "key_entities": "entity1, entity2, entity3"
-}
-"""
+with open(ANALYSIS_PROMPT_PATH, 'r', encoding='utf-8') as f:
+    ANALYSIS_SYSTEM_PROMPT = f.read()
 
 
 def analyse_article(
@@ -111,14 +76,23 @@ def analyse_article(
             bias_score = 0
         bias_score = max(-5, min(5, int(bias_score)))
 
+        from datetime import datetime, timezone
+        context_summary = '\n\n'.join(filter(None, [
+            f"**Background:** {result.get('background', '')}",
+            f"**Significance:** {result.get('significance', '')}",
+            f"**Implications:** {result.get('implications', '')}",
+            f"**Perspectives:** {result.get('perspectives', '')}",
+        ]))
+
         return {
-            'article_id':      article_id,
-            'sentiment':       result.get('sentiment', 'neutral'),
-            'bias_score':      bias_score,
-            'bias_direction':  result.get('bias_direction', 'neutral'),
-            'context_summary': result.get('context_summary', ''),
-            'key_entities':    result.get('key_entities', ''),
-            'model_used':      'claude-sonnet-4-5'
+            'article_id': article_id,
+            'sentiment': 'neutral',
+            'bias_score': 0,
+            'bias_direction': 'neutral',
+            'context_summary': context_summary,
+            'key_entities': result.get('key_entities', ''),
+            'analysed_at': datetime.now(timezone.utc).isoformat(),
+            'model_used': result.get('model_used', 'claude-sonnet-4-5')
         }
 
     except json.JSONDecodeError as e:

@@ -184,6 +184,7 @@ def run_cron():
                         'keyword_score': article.get('keyword_score', 0),
                         'category': article.get('category', ''),
                         'cron_run_id': run_id,
+                        'clean_body': article.get('clean_body', ''),
                     }
                     insert_article(row)
                     articles_stored += 1
