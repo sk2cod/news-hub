@@ -16,7 +16,22 @@ def render_analysis_panel(analysis: dict):
     # Context summary contains all four sections formatted
     context = analysis.get('context_summary', '')
     if context:
-        st.markdown(context)
+        sections = context.split('\n\n')
+        for section in sections:
+            if section.startswith('**Background:**'):
+                st.markdown('#### 🏛 Background')
+                st.write(section.replace('**Background:**', '').strip())
+            elif section.startswith('**Significance:**'):
+                st.markdown('#### 🎯 Significance')
+                st.write(section.replace('**Significance:**', '').strip())
+            elif section.startswith('**Implications:**'):
+                st.markdown('#### 🔮 Implications')
+                st.write(section.replace('**Implications:**', '').strip())
+            elif section.startswith('**Perspectives:**'):
+                st.markdown('#### 👥 Perspectives')
+                st.write(section.replace('**Perspectives:**', '').strip())
+            else:
+                st.write(section)
 
     # Key entities
     entities = analysis.get('key_entities', '')

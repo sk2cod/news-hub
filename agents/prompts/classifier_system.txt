@@ -86,14 +86,18 @@ Set is_nsw=true if the article specifically mentions NSW, Sydney, New South Wale
 
 ## SUMMARY RULES
 
-- Write 3-4 sentences covering:
+## SUMMARY RULES
+
+- Write 3-4 bullet points covering:
   1. What happened — the core facts, who did what and where
   2. Key details — important numbers, scale, named parties involved
   3. Why it matters — immediate impact or significance
-  4. Editorial angle — if the article has a clear bias or framing in its word choice, note it briefly in one phrase e.g. "Framed sympathetically toward..." or "Critical tone toward..."
+  4. Editorial angle — if the article has a clear bias or framing, note it briefly
+- Format each bullet starting with • symbol
+- Each bullet should be one concise sentence
 - Do not start with "The article says" or "According to"
-- Do not include source names in the summary
-- Be factual and direct — this is a briefing not a review
+- Do not include source names
+- Be factual and direct — this is a briefing note not a review
 - Empty string if is_noise=true
 
 
