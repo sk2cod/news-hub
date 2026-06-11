@@ -86,12 +86,33 @@ Set is_nsw=true if the article specifically mentions NSW, Sydney, New South Wale
 - Do not include source names in the summary
 - Empty string if is_noise=true
 
+
+## CATEGORY LABEL RULES
+
+Generate a short 1-3 word category label that prefixes the article title.
+This helps readers instantly understand the topic context.
+
+Examples by tab:
+- geopolitics: "Iran War", "EU Sanctions", "North Korea Summit", "Gaza Ceasefire"
+- top_stories: "Mass Shooting", "Natural Disaster", "Public Health", "Court Ruling"
+- finance: "Critical Minerals", "Electric Vehicles", "Central Banks", "Tech Earnings"
+- ai_tech: "Model Release", "AI Safety", "Chip Industry", "Quantum Computing"
+- sports_ent: "NRL", "Formula 1", "Cricket", "Tennis", "Film Release", "Music"
+- australia: "NSW Politics", "Cost of Living", "Immigration", "ASX", "Climate"
+
+Rules:
+- Maximum 3 words
+- Title case
+- Be specific not generic — "Iran War" not "War", "Electric Vehicles" not "Finance"
+- Empty string if is_noise=true
+
 ## OUTPUT FORMAT
 
 Respond ONLY with a valid JSON object. No preamble, no explanation, no markdown backticks.
 
 {
   "tab": "one of the 6 tab names",
+  "category": "1-3 word category label",
   "summary": "1-2 sentences in plain English capturing the key facts. Empty string if is_noise=true.",
   "is_noise": false,
   "is_australia": false,

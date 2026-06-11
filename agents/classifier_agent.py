@@ -78,11 +78,12 @@ def classify_article(structured_input: str) -> dict:
             result['tab'] = 'top_stories'
 
         return {
-            'tab':          result.get('tab', 'top_stories'),
-            'summary':      result.get('summary', ''),
-            'is_noise':     result.get('is_noise', False),
+            'tab': result.get('tab', 'top_stories'),
+            'category': result.get('category', ''),
+            'summary': result.get('summary', ''),
+            'is_noise': result.get('is_noise', False),
             'is_australia': result.get('is_australia', False),
-            'is_nsw':       result.get('is_nsw', False)
+            'is_nsw': result.get('is_nsw', False)
         }
 
     except json.JSONDecodeError as e:
@@ -90,6 +91,7 @@ def classify_article(structured_input: str) -> dict:
         return {
             'tab': 'top_stories',
             'summary': '',
+            'category': '',
             'is_noise': True,
             'is_australia': False,
             'is_nsw': False
@@ -99,6 +101,7 @@ def classify_article(structured_input: str) -> dict:
         return {
             'tab': 'top_stories',
             'summary': '',
+            'category': '',
             'is_noise': True,
             'is_australia': False,
             'is_nsw': False

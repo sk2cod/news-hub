@@ -25,6 +25,7 @@ st.set_page_config(
 st.title("📰 Intelligent News Hub")
 
 last_run = get_last_cron_run()
+latest_run_id = last_run.get('id') if last_run else None
 if last_run:
     from datetime import datetime, timezone, timedelta
     sydney_tz = timezone(timedelta(hours=10))
@@ -96,7 +97,7 @@ for tab_ui, (tab_label, tab_key) in zip(tabs[:6], list(TABS.items())[:6]):
 
             for article in articles:
                 article_id = article['id']
-                render_article_card(article)
+                render_article_card(article, latest_run_id=latest_run_id)
 
  # Quick Analysis — Haiku
                 quick_key = f"quick_{article_id}"
