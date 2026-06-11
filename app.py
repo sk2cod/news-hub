@@ -11,6 +11,7 @@ from components.analysis_panel import render_analysis_panel
 from agents.crew import run_analysis_crew, run_quick_analysis_crew
 from components.run_dashboard import render_run_dashboard
 from db.queries import get_recent_cron_runs
+from ingester.cron import run_cron
 
 load_dotenv()
 
@@ -26,22 +27,35 @@ st.title("📰 Intelligent News Hub")
 
 last_run = get_last_cron_run()
 latest_run_id = last_run.get('id') if last_run else None
-if last_run:
-    from datetime import datetime, timezone, timedelta
-    sydney_tz = timezone(timedelta(hours=10))
-    finished_utc = last_run.get('finished_at', '')
-    if finished_utc:
-        dt = datetime.fromisoformat(finished_utc.replace('Z', '+00:00'))
-        dt_sydney = dt.astimezone(sydney_tz)
-        formatted = dt_sydney.strftime('%d %b %Y %I:%M %p AEST')
+col_header, col_button = st.columns([4, 1])
+
+with col_header:
+    if last_run:
+        from datetime import datetime, timezone, timedelta
+        sydney_tz = timezone(timedelta(hours=10))
+        finished_utc = last_run.get('finished_at', '')
+        if finished_utc:
+            dt = datetime.fromisoformat(finished_utc.replace('Z', '+00:00'))
+            dt_sydney = dt.astimezone(sydney_tz)
+            formatted = dt_sydney.strftime('%d %b %Y %I:%M %p AEST')
+        else:
+            formatted = 'Unknown'
+        st.caption(
+            f"Last updated: {formatted} · "
+            f"{last_run.get('articles_stored', 0)} new articles stored"
+        )
     else:
-        formatted = 'Unknown'
-    st.caption(
-        f"Last updated: {formatted} · "
-        f"{last_run.get('articles_stored', 0)} new articles stored"
-    )
-else:
-    st.caption("Feed not yet populated — run the cron job first")
+        st.caption("Feed not yet populated — run the cron job first")
+
+with col_button:
+    if st.button("🔄 Refresh Feed", help="Fetch latest news from all sources"):
+        with st.spinner("Fetching latest news..."):
+            try:
+                run_cron()
+                st.success("Feed refreshed successfully")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Refresh failed: {e}")
 
 with st.expander("📊 Ingestion Dashboard & Cost Tracker", expanded=False):
     cron_runs = get_recent_cron_runs(limit=10)
