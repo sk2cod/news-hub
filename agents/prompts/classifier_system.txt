@@ -11,7 +11,7 @@ Your job is to classify and summarise news articles.
 
 4. ai_tech — ONLY major AI and technology developments. New frontier model releases, AI regulation and policy, significant research papers, large funding rounds (>$100M), documented AI deployments or failures with measurable impact, semiconductor and compute infrastructure.
 
-5. sports_ent — Sports results, transfers, championships, entertainment news, film and music releases, award ceremonies, celebrity news with factual basis.
+5. sports_ent — A leisure digest for a casual reader, not a specialist follower. Sports results and entertainment industry news at a broad cultural level.
 
 6. australia — News primarily about Australia at national or NSW/Sydney level. Australian politics, RBA decisions, Australian disasters, NSW government, Sydney-specific news.
 
@@ -22,6 +22,43 @@ Your job is to classify and summarise news articles.
 - Australian stories about finance still go to australia tab.
 - AI regulation stories go to ai_tech not geopolitics.
 - Australian sports stories (AFL, NRL, Socceroos, Wallabies, Matildas) go to australia tab not sports_ent.
+
+## SPORTS & ENTERTAINMENT FILTER RULES
+
+The test for every sports_ent article: "Would someone who doesn't closely follow this sport or celebrity still find this interesting or worth knowing?"
+
+KEEP for sports:
+- Final results and standings from major tournaments and championships
+- Formula 1, MotoGP, Cricket, Tennis Grand Slams, FIFA World Cup, NRL, AFL, Rugby Union, Olympics — scores and key highlights
+- Deaths, lifetime bans, or major scandals involving globally recognised athletes
+- Stories with geopolitical or cultural significance beyond the sport itself e.g. "Baseball banned in North Korea", "Olympics moved due to war"
+- Australian sport results at national level — NRL, AFL, Socceroos, Wallabies, Matildas, Cricket Australia
+
+KEEP for entertainment:
+- Major film or TV releases from globally recognised directors or franchises
+- Award ceremony results — Oscars, Grammys, Emmys, BAFTAs — winners announced
+- Music chart milestones or record-breaking tours from global artists
+- Industry-level news that affects content audiences watch or listen to e.g. "Directors Guild reaches deal", "Netflix cancels all reality shows"
+- Cultural moments with broad global relevance
+
+MARK AS NOISE for sports:
+- Regular season game recaps for NHL, MLB, NBA (non-finals)
+- US college sports — NCAA, Big 12, college football rankings
+- Player contract negotiations, lawsuits, or agent disputes unless globally significant
+- Coach or manager press conference quotes with no news event
+- Fantasy sports, betting odds, or draft analysis
+- Training camp updates or pre-season speculation
+- Transfer rumours with words: could, might, reportedly considering
+- Sport-specific statistics breakdowns for non-major events
+
+MARK AS NOISE for entertainment:
+- Celebrity relationship gossip, breakups, dating rumours
+- Paparazzi sightings or red carpet fashion coverage
+- Reality TV episode recaps or contestant drama
+- Local or regional radio and TV ratings
+- Social media feuds or viral moments with no broader significance
+- Promotional interviews that are purely PR for an upcoming release
+- Awards show fashion or seating arrangements
 
 ## QUALITY FILTER RULES
 

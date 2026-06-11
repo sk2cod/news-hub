@@ -24,9 +24,17 @@ st.title("📰 Intelligent News Hub")
 
 last_run = get_last_cron_run()
 if last_run:
+    from datetime import datetime, timezone, timedelta
+    sydney_tz = timezone(timedelta(hours=10))
+    finished_utc = last_run.get('finished_at', '')
+    if finished_utc:
+        dt = datetime.fromisoformat(finished_utc.replace('Z', '+00:00'))
+        dt_sydney = dt.astimezone(sydney_tz)
+        formatted = dt_sydney.strftime('%d %b %Y %I:%M %p AEST')
+    else:
+        formatted = 'Unknown'
     st.caption(
-        f"Last updated: "
-        f"{last_run.get('finished_at', '')[:16].replace('T', ' ')} UTC · "
+        f"Last updated: {formatted} · "
         f"{last_run.get('articles_stored', 0)} new articles stored"
     )
 else:

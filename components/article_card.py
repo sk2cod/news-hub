@@ -49,7 +49,8 @@ def render_article_card(article: dict, show_analysis_button: bool = True):
     badge_str = ' '.join(badges)
 
     # Meta line — source · time · badges
-    meta = f"🔸 {source} · {timestamp}"
+    score = article.get('keyword_score', 0)
+    meta = f"🔸 {source} · {timestamp} · score {score}"
     if badge_str:
         meta += f" · {badge_str}"
     st.caption(meta)
