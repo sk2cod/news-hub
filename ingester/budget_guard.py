@@ -6,8 +6,8 @@ load_dotenv()
 
 # Daily token limits — adjust these as needed
 DAILY_LIMITS = {
-    'haiku_input_tokens':  200_000,
-    'haiku_output_tokens':  50_000,
+    'haiku_input_tokens':  400_000,
+    'haiku_output_tokens': 100_000,
     'sonnet_input_tokens':  20_000,
     'sonnet_output_tokens': 10_000,
 }
