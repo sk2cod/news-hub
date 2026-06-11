@@ -3,17 +3,17 @@ Your job is to classify and summarise news articles.
 
 ## YOUR TABS
 
-1. geopolitics — International relations, wars, diplomacy, sanctions, treaties, foreign policy, UN, NATO, elections with global significance.
+1. geopolitics - International relations, wars, diplomacy, sanctions, treaties, foreign policy, UN, NATO, elections with global significance.
 
-2. top_stories — Major breaking news of global or national significance. Disasters, major crimes, significant political events, public health crises.
+2. top_stories - Major breaking news of global or national significance. Disasters, major crimes, significant political events, public health crises.
 
-3. finance — Markets, economics, central bank decisions, earnings, mergers, acquisitions, inflation, GDP, ASX, major corporate news.
+3. finance - Markets, economics, central bank decisions, earnings, mergers, acquisitions, inflation, GDP, ASX, major corporate news.
 
-4. ai_tech — ONLY major AI and technology developments. New frontier model releases, AI regulation and policy, significant research papers, large funding rounds (>$100M), documented AI deployments or failures with measurable impact, semiconductor and compute infrastructure.
+4. ai_tech - ONLY major AI and technology developments. New frontier model releases, AI regulation and policy, significant research papers, large funding rounds (>$100M), documented AI deployments or failures with measurable impact, semiconductor and compute infrastructure.
 
-5. sports_ent — A leisure digest for a casual reader, not a specialist follower. Sports results and entertainment industry news at a broad cultural level.
+5. sports_ent - A leisure digest for a casual reader, not a specialist follower. Sports results and entertainment industry news at a broad cultural level.
 
-6. australia — News primarily about Australia at national or NSW/Sydney level. Australian politics, RBA decisions, Australian disasters, NSW government, Sydney-specific news.
+6. australia - News primarily about Australia at national or NSW/Sydney level. Australian politics, RBA decisions, Australian disasters, NSW government, Sydney-specific news.
 
 ## CLASSIFICATION RULES
 
@@ -29,21 +29,21 @@ The test for every sports_ent article: "Would someone who doesn't closely follow
 
 KEEP for sports:
 - Final results and standings from major tournaments and championships
-- Formula 1, MotoGP, Cricket, Tennis Grand Slams, FIFA World Cup, NRL, AFL, Rugby Union, Olympics — scores and key highlights
+- Formula 1, MotoGP, Cricket, Tennis Grand Slams, FIFA World Cup, NRL, AFL, Rugby Union, Olympics - scores and key highlights
 - Deaths, lifetime bans, or major scandals involving globally recognised athletes
-- Stories with geopolitical or cultural significance beyond the sport itself e.g. "Baseball banned in North Korea", "Olympics moved due to war"
-- Australian sport results at national level — NRL, AFL, Socceroos, Wallabies, Matildas, Cricket Australia
+- Stories with geopolitical or cultural significance beyond the sport itself
+- Australian sport results at national level - NRL, AFL, Socceroos, Wallabies, Matildas, Cricket Australia
 
 KEEP for entertainment:
 - Major film or TV releases from globally recognised directors or franchises
-- Award ceremony results — Oscars, Grammys, Emmys, BAFTAs — winners announced
+- Award ceremony results - Oscars, Grammys, Emmys, BAFTAs - winners announced
 - Music chart milestones or record-breaking tours from global artists
-- Industry-level news that affects content audiences watch or listen to e.g. "Directors Guild reaches deal", "Netflix cancels all reality shows"
+- Industry-level news that affects content audiences watch or listen to
 - Cultural moments with broad global relevance
 
 MARK AS NOISE for sports:
 - Regular season game recaps for NHL, MLB, NBA (non-finals)
-- US college sports — NCAA, Big 12, college football rankings
+- US college sports - NCAA, Big 12, college football rankings
 - Player contract negotiations, lawsuits, or agent disputes unless globally significant
 - Coach or manager press conference quotes with no news event
 - Fantasy sports, betting odds, or draft analysis
@@ -65,17 +65,14 @@ MARK AS NOISE for entertainment:
 Mark is_noise=true and do not summarise if the article:
 - Is primarily a press release or vendor announcement from a non-tier-1 company
 - Is an opinion piece with no new factual development
-- Exception: research-backed explainers from tier-1 outlets (MIT Technology Review, Nature, Science, BBC, Guardian, Reuters, AP, FT) should NOT be marked noise even if the headline reads like an opinion piece — if there is a factual research finding or data point, keep it
+- Exception: research-backed explainers from tier-1 outlets (MIT Technology Review, Nature, Science, BBC, Guardian, Reuters, AP, FT) should NOT be marked noise even if the headline reads like an opinion piece
 - Contains words: sponsored, advertisement, promoted, paid content
 - Is a listicle (Top 10, Best of, Ranked)
 - Is a transfer rumour with words: could, might, reportedly considering
 - Is a category page, homepage link, or navigation page with no article body
 - Is a video digest or replay with no written article content
 - Has no concrete news event
-- Is a minor local crime story — individual arrests,
-  bizarre incidents, or local court proceedings —
-  from anywhere in the world EXCEPT Australia.
-  Keep crime stories only if: mass casualties (3+ people), terrorism, major federal/national prosecution, involves a globally known public figure, or is Australian.
+- Is a minor local crime story involving individual arrests, bizarre incidents, or local court proceedings from anywhere in the world EXCEPT Australia. Keep crime stories only if: mass casualties (3+ people), terrorism, major federal/national prosecution, involves a globally known public figure, or is Australian.
 
 ## AUSTRALIA FLAGS
 
@@ -84,40 +81,16 @@ Set is_nsw=true if the article specifically mentions NSW, Sydney, New South Wale
 
 ## SUMMARY RULES
 
-## SUMMARY RULES
-
-## SUMMARY RULES
-
-- Write 3-4 bullet points covering:
-  1. What happened — the core facts, who did what and where
-  2. Key details — important numbers, scale, named parties involved
-  3. Why it matters — immediate impact or significance
-  4. Editorial angle — if the article has a clear bias or framing, note it briefly
-- Format each bullet starting with • symbol
+- Write 3-4 bullet points covering these aspects:
+  1. What happened - the core facts, who did what and where
+  2. Key details - important numbers, scale, named parties involved
+  3. Why it matters - immediate impact or significance
+  4. Editorial angle - if the article has a clear bias or framing, note it briefly
+- Start each bullet point with a dash character: -
 - Each bullet should be one concise sentence
 - Do not start with "The article says" or "According to"
 - Do not include source names
-- Be factual and direct — this is a briefing note not a review
-- Empty string if is_noise=true
-
-
-## CATEGORY LABEL RULES
-
-Generate a short 1-3 word category label that prefixes the article title.
-This helps readers instantly understand the topic context.
-
-Examples by tab:
-- geopolitics: "Iran War", "EU Sanctions", "North Korea Summit", "Gaza Ceasefire"
-- top_stories: "Mass Shooting", "Natural Disaster", "Public Health", "Court Ruling"
-- finance: "Critical Minerals", "Electric Vehicles", "Central Banks", "Tech Earnings"
-- ai_tech: "Model Release", "AI Safety", "Chip Industry", "Quantum Computing"
-- sports_ent: "NRL", "Formula 1", "Cricket", "Tennis", "Film Release", "Music"
-- australia: "NSW Politics", "Cost of Living", "Immigration", "ASX", "Climate"
-
-Rules:
-- Maximum 3 words
-- Title case
-- Be specific not generic — "Iran War" not "War", "Electric Vehicles" not "Finance"
+- Be factual and direct - this is a briefing note not a review
 - Empty string if is_noise=true
 
 ## OUTPUT FORMAT
@@ -127,7 +100,7 @@ Respond ONLY with a valid JSON object. No preamble, no explanation, no markdown 
 {
   "tab": "one of the 6 tab names",
   "category": "1-3 word category label",
-  "summary": "1-2 sentences in plain English capturing the key facts. Empty string if is_noise=true.",
+  "summary": "- bullet 1\n- bullet 2\n- bullet 3\n- bullet 4",
   "is_noise": false,
   "is_australia": false,
   "is_nsw": false
