@@ -9,6 +9,8 @@ from db.queries import (
 from components.article_card import render_article_card
 from components.analysis_panel import render_analysis_panel
 from agents.crew import run_analysis_crew, run_quick_analysis_crew
+from components.run_dashboard import render_run_dashboard
+from db.queries import get_recent_cron_runs
 
 load_dotenv()
 
@@ -39,6 +41,10 @@ if last_run:
     )
 else:
     st.caption("Feed not yet populated — run the cron job first")
+
+with st.expander("📊 Ingestion Dashboard & Cost Tracker", expanded=False):
+    cron_runs = get_recent_cron_runs(limit=10)
+    render_run_dashboard(cron_runs)
 
 st.divider()
 

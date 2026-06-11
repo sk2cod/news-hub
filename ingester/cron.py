@@ -4,7 +4,7 @@ from ingester.fetcher import fetch_all_articles
 from ingester.dedup import check_duplicate
 from ingester.preprocessor import preprocess_article
 from ingester.keyword_scores import score_article
-from ingester.budget_guard import reset_usage, print_usage_summary
+from ingester.budget_guard import reset_usage, print_usage_summary, get_usage_summary
 from agents.crew import run_classification_crew
 from db.queries import (
     get_existing_url_hashes,
@@ -205,23 +205,39 @@ def run_cron():
         print("========================================\n")
         print_usage_summary()
 
+        usage = get_usage_summary()
         finish_cron_run(
             run_id,
             articles_fetched,
             articles_dropped,
             articles_stored,
-            status='complete'
+            status='complete',
+            haiku_input_tokens=usage['haiku_input_tokens'],
+            haiku_output_tokens=usage['haiku_output_tokens'],
+            sonnet_input_tokens=usage['sonnet_input_tokens'],
+            sonnet_output_tokens=usage['sonnet_output_tokens'],
+            total_cost_usd=usage['total_cost_usd'],
+            borderline_stored=len(borderline_queue),
+            noise_dropped=len(haiku_queue) - len(classified_articles) if haiku_queue else 0
         )
 
     except Exception as e:
         print(f"\nCRON JOB FAILED: {e}")
+        usage = get_usage_summary()
         finish_cron_run(
             run_id,
             articles_fetched,
             articles_dropped,
             articles_stored,
             status='failed',
-            error_msg=str(e)
+            error_msg=str(e),
+            haiku_input_tokens=usage['haiku_input_tokens'],
+            haiku_output_tokens=usage['haiku_output_tokens'],
+            sonnet_input_tokens=usage['sonnet_input_tokens'],
+            sonnet_output_tokens=usage['sonnet_output_tokens'],
+            total_cost_usd=usage['total_cost_usd'],
+            borderline_stored=len(borderline_queue),
+            noise_dropped=len(haiku_queue) - len(classified_articles) if haiku_queue else 0
         )
         raise
 

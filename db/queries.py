@@ -187,17 +187,31 @@ def finish_cron_run(
     articles_dropped: int,
     articles_stored: int,
     status: str = 'complete',
-    error_msg: str = None
+    error_msg: str = None,
+    haiku_input_tokens: int = 0,
+    haiku_output_tokens: int = 0,
+    sonnet_input_tokens: int = 0,
+    sonnet_output_tokens: int = 0,
+    total_cost_usd: float = 0.0,
+    borderline_stored: int = 0,
+    noise_dropped: int = 0
 ):
     """Update a cron run record when the job finishes."""
     from datetime import datetime, timezone
     supabase.table('cron_runs').update({
-        'finished_at': datetime.now(timezone.utc).isoformat(),
-        'articles_fetched': articles_fetched,
-        'articles_dropped': articles_dropped,
-        'articles_stored': articles_stored,
-        'status': status,
-        'error_msg': error_msg
+        'finished_at':         datetime.now(timezone.utc).isoformat(),
+        'articles_fetched':    articles_fetched,
+        'articles_dropped':    articles_dropped,
+        'articles_stored':     articles_stored,
+        'status':              status,
+        'error_msg':           error_msg,
+        'haiku_input_tokens':  haiku_input_tokens,
+        'haiku_output_tokens': haiku_output_tokens,
+        'sonnet_input_tokens': sonnet_input_tokens,
+        'sonnet_output_tokens':sonnet_output_tokens,
+        'total_cost_usd':      total_cost_usd,
+        'borderline_stored':   borderline_stored,
+        'noise_dropped':       noise_dropped
     }).eq('id', run_id).execute()
 
 
@@ -215,6 +229,17 @@ def get_last_cron_run() -> dict:
         .execute()
     )
     return response.data[0] if response.data else {}
+
+def get_recent_cron_runs(limit: int = 10) -> list:
+    """Fetch recent cron runs for the dashboard."""
+    response = (
+        supabase.table('cron_runs')
+        .select('*')
+        .order('started_at', desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return response.data
 
 # ─── Borderline Article Operations ────────────────────────────────────────────
 
