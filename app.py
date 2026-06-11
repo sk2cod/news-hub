@@ -4,13 +4,14 @@ from db.queries import (
     get_articles_by_tab_paginated,
     get_analysis,
     get_last_cron_run,
-    get_borderline_articles
+    get_borderline_articles,
+    get_recent_cron_runs,
+    get_borderline_analysis
 )
 from components.article_card import render_article_card
 from components.analysis_panel import render_analysis_panel
 from agents.crew import run_analysis_crew, run_quick_analysis_crew
 from components.run_dashboard import render_run_dashboard
-from db.queries import get_recent_cron_runs
 from ingester.cron import run_cron
 
 load_dotenv()
@@ -113,11 +114,9 @@ for tab_ui, (tab_label, tab_key) in zip(tabs[:6], list(TABS.items())[:6]):
                 article_id = article['id']
                 render_article_card(article, latest_run_id=latest_run_id)
 
- # Quick Analysis — Haiku
+                # Quick Analysis — Haiku
                 quick_key = f"quick_{article_id}"
                 if st.session_state.get(quick_key):
-                    from db.queries import get_borderline_analysis
-
                     existing_quick = get_borderline_analysis(article_id)
                     if existing_quick:
                         verdict = existing_quick.get('bias_direction', 'borderline')
@@ -134,7 +133,7 @@ for tab_ui, (tab_label, tab_key) in zip(tabs[:6], list(TABS.items())[:6]):
                             quick_analysis = run_quick_analysis_crew(
                                 article_id=article_id,
                                 title=article.get('title', ''),
-                                body=article.get('summary', ''),
+                                body=article.get('clean_body', '') or article.get('summary', ''),
                                 source_name=article.get('source_name', '')
                             )
                         if quick_analysis:
@@ -161,7 +160,7 @@ for tab_ui, (tab_label, tab_key) in zip(tabs[:6], list(TABS.items())[:6]):
                             analysis = run_analysis_crew(
                                 article_id=article_id,
                                 title=article.get('title', ''),
-                                body=article.get('summary', ''),
+                                body=article.get('clean_body', '') or article.get('summary', ''),
                                 source_name=article.get('source_name', '')
                             )
                         if analysis:
@@ -227,9 +226,7 @@ with tabs[6]:
                 col1, col2 = st.columns([4, 1])
                 with col1:
                     st.markdown(f"**[{title}]({url})**")
-                    st.caption(
-                        f"🔸 {source} · score {score} · {published}"
-                    )
+                    st.caption(f"🔸 {source} · score {score} · {published}")
                 with col2:
                     if st.button(
                         "⚡ Quick Analysis",
@@ -241,7 +238,6 @@ with tabs[6]:
                 # Show quick analysis if triggered
                 quick_key = f"quick_{article_id}"
                 if st.session_state.get(quick_key):
-                    from db.queries import get_borderline_analysis
                     existing = get_borderline_analysis(article_id)
                     if existing:
                         verdict = existing.get('bias_direction', 'borderline')
