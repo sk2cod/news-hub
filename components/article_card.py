@@ -2,17 +2,18 @@ import streamlit as st
 from datetime import datetime, timezone
 
 
-def time_ago(published_at: str) -> str:
-    """Convert a UTC timestamp to a human-readable 'X ago' string."""
-    if not published_at:
-        return 'Unknown time'
+def time_ago(article: dict) -> str:
+    """Use ingested_at for consistent recency display."""
+    timestamp = article.get('ingested_at') or article.get('published_at')
+    if not timestamp:
+        return 'Recently'
     try:
-        if isinstance(published_at, str):
-            published_at = datetime.fromisoformat(
-                published_at.replace('Z', '+00:00')
+        if isinstance(timestamp, str):
+            timestamp = datetime.fromisoformat(
+                timestamp.replace('Z', '+00:00')
             )
         now = datetime.now(timezone.utc)
-        diff = now - published_at
+        diff = now - timestamp
         seconds = int(diff.total_seconds())
 
         if seconds < 60:
@@ -24,7 +25,7 @@ def time_ago(published_at: str) -> str:
         else:
             return f"{seconds // 86400}d ago"
     except Exception:
-        return 'Unknown time'
+        return 'Recently'
 
 
 def render_article_card(article: dict, show_analysis_button: bool = True):

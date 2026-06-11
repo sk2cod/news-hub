@@ -75,14 +75,11 @@ def insert_article(article: dict) -> dict:
 
 
 def get_articles_by_tab(tab: str, limit: int = 10) -> list:
-    """
-    Fetch top N articles for a given tab ordered by published date.
-    Used by the Streamlit UI.
-    """
     response = (
         supabase.table('articles')
         .select('*')
         .eq('tab', tab)
+        .eq('is_borderline', False)
         .order('ingested_at', desc=True)
         .limit(limit)
         .execute()
@@ -97,11 +94,13 @@ def get_articles_by_tab_paginated(
 ) -> list:
     """
     Fetch articles with pagination support for 'Load next 10' button.
+    Excludes borderline articles — those show in the borderline tab only.
     """
     response = (
         supabase.table('articles')
         .select('*')
         .eq('tab', tab)
+        .eq('is_borderline', False)
         .order('ingested_at', desc=True)
         .range(offset, offset + limit - 1)
         .execute()
