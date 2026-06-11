@@ -37,7 +37,7 @@ def render_article_card(article: dict, show_analysis_button: bool = True):
     title = article.get('title', 'No title')
     summary = article.get('summary', '')
     source = article.get('source_name', 'Unknown source')
-    timestamp = time_ago(article.get('published_at'))
+    timestamp = time_ago(article)
 
     # Badges inline
     badges = []
