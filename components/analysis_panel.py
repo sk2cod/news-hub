@@ -13,25 +13,27 @@ def render_analysis_panel(analysis: dict):
     st.markdown("---")
     st.markdown("#### 🧠 Deep Analysis")
 
-    # Context summary contains all four sections formatted
     context = analysis.get('context_summary', '')
     if context:
         sections = context.split('\n\n')
         for section in sections:
-            if section.startswith('**Background:**'):
+            if not section.strip():
+                continue
+            clean = section.strip().replace('$', '\\$')
+            if clean.startswith('**Background:**'):
                 st.markdown('#### 🏛 Background')
                 st.markdown(clean.replace('**Background:**', '').strip())
-            elif section.startswith('**Significance:**'):
+            elif clean.startswith('**Significance:**'):
                 st.markdown('#### 🎯 Significance')
                 st.markdown(clean.replace('**Significance:**', '').strip())
-            elif section.startswith('**Implications:**'):
+            elif clean.startswith('**Implications:**'):
                 st.markdown('#### 🔮 Implications')
                 st.markdown(clean.replace('**Implications:**', '').strip())
-            elif section.startswith('**Perspectives:**'):
+            elif clean.startswith('**Perspectives:**'):
                 st.markdown('#### 👥 Perspectives')
                 st.markdown(clean.replace('**Perspectives:**', '').strip())
             else:
-                st.write(section)
+                st.markdown(clean)
 
     # Key entities
     entities = analysis.get('key_entities', '')
