@@ -20,16 +20,16 @@ def render_analysis_panel(analysis: dict):
         for section in sections:
             if section.startswith('**Background:**'):
                 st.markdown('#### 🏛 Background')
-                st.write(section.replace('**Background:**', '').strip())
+                st.markdown(clean.replace('**Background:**', '').strip())
             elif section.startswith('**Significance:**'):
                 st.markdown('#### 🎯 Significance')
-                st.write(section.replace('**Significance:**', '').strip())
+                st.markdown(clean.replace('**Significance:**', '').strip())
             elif section.startswith('**Implications:**'):
                 st.markdown('#### 🔮 Implications')
-                st.write(section.replace('**Implications:**', '').strip())
+                st.markdown(clean.replace('**Implications:**', '').strip())
             elif section.startswith('**Perspectives:**'):
                 st.markdown('#### 👥 Perspectives')
-                st.write(section.replace('**Perspectives:**', '').strip())
+                st.markdown(clean.replace('**Perspectives:**', '').strip())
             else:
                 st.write(section)
 
