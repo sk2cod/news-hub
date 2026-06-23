@@ -184,8 +184,6 @@ def fetch_rss_articles() -> list:
                     'Top headlines from', 'photojournalists',
                     'Associated Press News:', 'AP News:',
                     '| AP News', 'Full-length Replay',
-                    'MORE RUGBY VIDEOS', 'Watch Live Sport',
-                    'Sports News, Transfers, Scores',
                 ]
 
                 for entry in feed.entries[:15]:

@@ -1,6 +1,6 @@
 # 📰 Intelligent News Hub
 
-A production-grade AI-powered personal news briefing system built with Claude, CrewAI, and Streamlit. Fetches news from 19 RSS feeds and Tavily, filters noise deterministically, classifies and summarises using Claude Haiku, and provides on-demand deep analysis using Claude Sonnet.
+A production-grade AI-powered personal news briefing system built with Claude, CrewAI, and Streamlit. Fetches news from 17 RSS feeds and Tavily, filters noise deterministically, classifies and summarises using Claude Haiku, and provides on-demand deep analysis using Claude Sonnet.
 
 ---
 
@@ -13,7 +13,7 @@ A personal news briefing assistant — like a PA preparing a morning brief. The 
 ## Current Version: v1.2
 
 ### What it does
-- Fetches from 19 RSS feeds + Tavily across 6 topic tabs every run
+- Fetches from 17 RSS feeds + Tavily across 6 topic tabs every run
 - Drops duplicates and spam deterministically before any LLM involvement
 - Routes articles through a three-tier scoring system
 - Uses Claude Haiku to classify, write bullet-point summaries, and assign category labels
@@ -29,7 +29,7 @@ Story clustering and synthesis — group multiple sources covering the same even
 ## Architecture Overview
 
 ```
-RSS feeds + Tavily (19 sources)
+RSS feeds + Tavily (17 sources)
     ↓
 Title filter (category pages dropped — free, no LLM)
     ↓
@@ -144,7 +144,7 @@ news-hub/
 
 ```
 1. fetcher.py
-   - fetch_rss_articles() → 19 RSS feeds, 15 entries each, title filter applied
+   - fetch_rss_articles() → 17 RSS feeds, 15 entries each, title filter applied
    - fetch_tavily_articles() → 6 queries (one per tab), 10 results each
    - Returns flat list of raw article dicts with: title, url, body, source_id, tab
 
@@ -318,7 +318,7 @@ BLOCK_THRESHOLD = -5     # score ≤ -5 → blocked completely
 
 ---
 
-## RSS Sources (19 feeds)
+## RSS Sources (17 feeds)
 
 | Tab | Sources |
 |---|---|
@@ -326,7 +326,7 @@ BLOCK_THRESHOLD = -5     # score ≤ -5 → blocked completely
 | top_stories | Reuters Top (Google News), BBC Top, AP News (Google News) |
 | finance | Reuters Business (Google News), CNBC, Financial Times |
 | ai_tech | MIT Technology Review, Ars Technica, Wired |
-| sports_ent | BBC Sport, ESPN, Variety |
+| sports_ent | Variety |
 | australia | ABC News AU, The Guardian AU, Sydney Morning Herald, SBS News |
 
 Plus Tavily queries for each tab (10 results per query per run).
@@ -341,7 +341,7 @@ Plus Tavily queries for each tab (10 results per query per run).
 | 📰 Top Stories | top_stories | Major global breaking news |
 | 💹 Finance | finance | Markets, central banks, earnings |
 | 🤖 AI & Tech | ai_tech | Frontier models, AI policy, chips |
-| 🏆 Sports & Ent | sports_ent | Leisure sports digest, global entertainment |
+| 🏆 Entertainment | sports_ent | Film, music, awards, celebrity culture — no sports |
 | 🇦🇺 Australia | australia | National + NSW/Sydney news |
 | ⚠️ Borderline | borderline | Low-score articles, raw display, no Haiku |
 
