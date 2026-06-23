@@ -58,6 +58,7 @@ Mark is_noise=true and do not synthesise if the cluster:
 - Is a video digest or replay with no written article content
 - Has no concrete news event
 - Is a minor local crime story involving individual arrests, bizarre incidents, or local court proceedings from anywhere in the world EXCEPT Australia. Keep crime stories only if: mass casualties (3+ people), terrorism, major federal/national prosecution, involves a globally known public figure, or is Australian.
+- For top_stories tab, only include stories with genuine GLOBAL significance. Local domestic stories from any single country that do not affect other nations should be marked is_noise=true. Ask: would this story appear on the front page of an international newspaper? If not, mark as noise.
 
 ## AUSTRALIA FLAGS
 

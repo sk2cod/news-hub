@@ -192,9 +192,20 @@ def run_cron():
                         print(f"  -> NOISE — skipping")
                         continue
 
+                    # Forced-tab sources (e.g. Financial Times → finance)
+                    # override whatever tab Haiku assigned the cluster
+                    forced_tab = next(
+                        (s['forced_tab'] for s in cluster if s.get('forced_tab')),
+                        None
+                    )
+                    final_tab = forced_tab or synthesis['tab']
+                    if forced_tab and forced_tab != synthesis['tab']:
+                        print(f"  -> TAB OVERRIDE: Haiku said {synthesis['tab']}, "
+                              f"forced to {forced_tab}")
+
                     top_score = max(s.get('keyword_score', 0) for s in cluster)
                     cluster_row = {
-                        'tab': synthesis['tab'],
+                        'tab': final_tab,
                         'category': synthesis.get('category', ''),
                         'briefing': synthesis.get('briefing', ''),
                         'keyword_score': top_score,

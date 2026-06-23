@@ -135,6 +135,13 @@ TAVILY_QUERIES = {
 }
 
 
+# Sources whose tab assignment must never be overridden by downstream
+# Haiku classification — cron.py enforces this when storing each cluster.
+FORCED_TAB_OVERRIDES = {
+    'ft-world': 'finance',
+}
+
+
 def parse_rss_entry(entry: dict, source: dict, tab: str) -> dict:
     """Convert a feedparser entry into our standard article dict."""
     title = entry.get('title', '').strip()
@@ -150,6 +157,8 @@ def parse_rss_entry(entry: dict, source: dict, tab: str) -> dict:
     if 'published_parsed' in entry and entry.published_parsed:
         published_at = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc).isoformat()
 
+    forced_tab = FORCED_TAB_OVERRIDES.get(source['id'])
+
     return {
         'title': title,
         'url': url,
@@ -157,7 +166,8 @@ def parse_rss_entry(entry: dict, source: dict, tab: str) -> dict:
         'source_id': source['id'],
         'source_name': source['name'],
         'source_country': source['country'],
-        'tab': tab,
+        'tab': forced_tab or tab,
+        'forced_tab': forced_tab,
         'published_at': published_at,
     }
 
