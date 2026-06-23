@@ -65,6 +65,23 @@ Mark is_noise=true and do not synthesise if the cluster:
 Set is_australia=true if the cluster is primarily about Australia nationally.
 Set is_nsw=true if any source specifically mentions NSW, Sydney, New South Wales, or NSW state institutions.
 
+## EVENT VERIFICATION
+
+Before synthesising, check: are ALL sources in this cluster describing
+the SAME specific news event — not just the same broad topic, person,
+or country?
+- Same event: multiple sources reporting on the same announcement,
+  decision, match, disaster, ruling, or development.
+- NOT the same event: sources that share a topic, entity, or country
+  but describe different incidents (e.g. one source on an Iran nuclear
+  deal and another on an unrelated Iran earthquake).
+- If the cluster has only one source, is_single_event is always true.
+
+Set "is_single_event" to true only if every source describes the same
+event. If not, set it to false and still produce your best synthesis
+of the dominant event among the sources — the caller may discard this
+result and keep the sources as separate stories if this is false.
+
 ## SYNTHESIS RULES
 
 - Read all sources in the cluster as ONE event, not separate stories.
@@ -92,5 +109,6 @@ Respond ONLY with a valid JSON object. No preamble, no explanation, no markdown 
   "briefing": "- bullet 1\n- bullet 2\n- bullet 3\n- bullet 4",
   "is_noise": false,
   "is_australia": false,
-  "is_nsw": false
+  "is_nsw": false,
+  "is_single_event": true
 }

@@ -2,7 +2,12 @@ import os
 import sys
 from dotenv import load_dotenv
 from ingester.fetcher import fetch_all_articles
-from ingester.dedup import check_duplicate, cluster_articles, compute_title_simhash
+from ingester.dedup import (
+    check_duplicate,
+    cluster_articles,
+    compute_title_simhash,
+    group_clusters_for_merge
+)
 from ingester.preprocessor import preprocess_article
 from ingester.keyword_scores import score_article
 from ingester.budget_guard import reset_usage, print_usage_summary, get_usage_summary
@@ -15,6 +20,8 @@ from db.queries import (
     insert_url_hash,
     insert_story_cluster,
     insert_cluster_source,
+    reparent_cluster_sources,
+    delete_story_clusters,
     cleanup_old_articles,
     start_cron_run,
     finish_cron_run
@@ -46,8 +53,13 @@ def run_cron():
          stored immediately (one row in story_clusters, one row per
          source in cluster_sources) so a later failure doesn't discard
          already-synthesised clusters
-      8. finish_cron_run() with token usage
-      9. cleanup_old_articles() — 7-day TTL
+      6. group_clusters_for_merge() — deferred second pass over this
+         run's stored clusters, catching same-event stories the first
+         TF-IDF pass missed (short Tavily snippets). Re-synthesises and
+         merges matching clusters, with a Haiku confirmation check
+         (is_single_event) before committing each merge
+      7. finish_cron_run() with token usage
+      8. cleanup_old_articles() — 7-day TTL
     """
     print("\n========================================")
     print("NEWS HUB CRON JOB STARTING")
@@ -63,6 +75,11 @@ def run_cron():
     haiku_queue = []
     clusters = []
     synthesised = []
+    stored_clusters = []
+    clusters_before_merge = 0
+    clusters_after_merge = 0
+    merges_accepted = 0
+    merges_rejected = 0
 
     try:
         # Step 1 — Fetch all raw articles
@@ -230,6 +247,14 @@ def run_cron():
 
                     synthesis['sources'] = cluster
                     synthesised.append(synthesis)
+                    stored_clusters.append({
+                        'id': cluster_id,
+                        'tab': final_tab,
+                        'category': synthesis.get('category', ''),
+                        'briefing': synthesis.get('briefing', ''),
+                        'sources': cluster,
+                        'source_count': len(cluster),
+                    })
                     articles_stored += len(cluster)
                     print(f"  -> {synthesis['tab']} | {synthesis['briefing'][:60]}")
                 except Exception as e:
@@ -238,7 +263,74 @@ def run_cron():
         else:
             print("\nNo articles for Haiku this run")
 
-        # Step 8 — Final summary + finish_cron_run with token usage
+        # Step 6 — Deferred meta-clustering over THIS run's stored
+        # clusters, catching same-event stories the first TF-IDF pass
+        # missed. Runs after first-pass storage so a bug here can never
+        # discard already-committed clusters.
+        clusters_before_merge = len(stored_clusters)
+        clusters_after_merge = clusters_before_merge
+        try:
+            if len(stored_clusters) > 1:
+                print("\n--- Meta-clustering: checking for same-event merges ---")
+                merge_groups = group_clusters_for_merge(stored_clusters)
+                clusters_removed = 0
+
+                for group in merge_groups:
+                    if len(group) < 2:
+                        continue
+
+                    combined_sources = [s for c in group for s in c['sources']]
+                    category_preview = ' + '.join(c['category'] or '(none)' for c in group)
+                    print(f"Re-synthesising merge candidate "
+                          f"({len(group)} clusters, {len(combined_sources)} sources): "
+                          f"{category_preview}")
+
+                    try:
+                        resynth = synthesise_cluster(combined_sources)
+
+                        if resynth['is_noise'] or not resynth.get('is_single_event', True):
+                            merges_rejected += 1
+                            print(f"  -> MERGE REJECTED (not single event) — keeping originals")
+                            continue
+
+                        forced_tab = next(
+                            (s['forced_tab'] for s in combined_sources if s.get('forced_tab')),
+                            None
+                        )
+                        final_merge_tab = forced_tab or resynth['tab']
+                        top_score = max(s.get('keyword_score', 0) for s in combined_sources)
+
+                        merged_row = {
+                            'tab': final_merge_tab,
+                            'category': resynth.get('category', ''),
+                            'briefing': resynth.get('briefing', ''),
+                            'keyword_score': top_score,
+                            'cron_run_id': run_id,
+                            'is_borderline': False,
+                        }
+                        stored_merged = insert_story_cluster(merged_row)
+                        new_cluster_id = stored_merged['id']
+
+                        old_ids = [c['id'] for c in group]
+                        reparent_cluster_sources(old_ids, new_cluster_id)
+                        delete_story_clusters(old_ids)
+
+                        merges_accepted += 1
+                        clusters_removed += len(group) - 1
+                        print(f"  -> MERGED into [{final_merge_tab}] "
+                              f"{resynth.get('category', '')} "
+                              f"({len(group)} clusters -> 1, {len(combined_sources)} sources)")
+                    except Exception as e:
+                        merges_rejected += 1
+                        print(f"MERGE ERROR: {e}")
+
+                clusters_after_merge = clusters_before_merge - clusters_removed
+                print(f"\nMeta-clustering: {merges_accepted} merged, "
+                      f"{merges_rejected} rejected")
+        except Exception as e:
+            print(f"META-CLUSTERING FAILED (first-pass clusters unaffected): {e}")
+
+        # Step 7 — Final summary + finish_cron_run with token usage
         noise_dropped = len(haiku_queue) - sum(len(c['sources']) for c in synthesised)
 
         print("\n========================================")
@@ -246,7 +338,9 @@ def run_cron():
         print(f"Fetched:      {articles_fetched}")
         print(f"Dropped:      {articles_dropped}")
         print(f"Stored:       {articles_stored}")
-        print(f"  Clusters:   {len(synthesised)}")
+        print(f"  Clusters:   {clusters_after_merge} "
+              f"(before merge: {clusters_before_merge})")
+        print(f"  Merges:     {merges_accepted} accepted, {merges_rejected} rejected")
         print(f"  Borderline: {len(borderline_queue)}")
         print("========================================\n")
         print_usage_summary()
@@ -267,7 +361,7 @@ def run_cron():
             noise_dropped=noise_dropped
         )
 
-        # Step 9 — Cleanup old articles/clusters (7-day TTL)
+        # Step 8 — Cleanup old articles/clusters (7-day TTL)
         print("\n--- Running 7-day TTL cleanup ---")
         cleanup_old_articles()
 

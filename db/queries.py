@@ -165,6 +165,26 @@ def insert_cluster_source(source: dict) -> dict:
     return response.data[0] if response.data else {}
 
 
+def reparent_cluster_sources(old_cluster_ids: list, new_cluster_id: str):
+    """
+    Re-point cluster_sources rows from one or more clusters to a newly
+    merged cluster. Used by the second-pass meta-clustering in cron.py
+    when several same-event clusters from one run get combined.
+    """
+    supabase.table('cluster_sources').update({
+        'cluster_id': new_cluster_id
+    }).in_('cluster_id', old_cluster_ids).execute()
+
+
+def delete_story_clusters(cluster_ids: list):
+    """
+    Delete story_clusters rows. Used after a successful merge, once
+    their sources have already been re-parented to the new cluster —
+    otherwise cluster_sources would cascade-delete with them.
+    """
+    supabase.table('story_clusters').delete().in_('id', cluster_ids).execute()
+
+
 def get_story_clusters_by_tab_paginated(
     tab: str,
     limit: int = 10,

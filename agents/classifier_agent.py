@@ -174,7 +174,8 @@ def synthesise_cluster(cluster: list) -> dict:
             'briefing': '',
             'is_noise': True,
             'is_australia': False,
-            'is_nsw': False
+            'is_nsw': False,
+            'is_single_event': True
         }
 
     cluster_input = build_cluster_input(cluster)
@@ -221,7 +222,8 @@ def synthesise_cluster(cluster: list) -> dict:
             'briefing': result.get('briefing', ''),
             'is_noise': result.get('is_noise', False),
             'is_australia': result.get('is_australia', False),
-            'is_nsw': result.get('is_nsw', False)
+            'is_nsw': result.get('is_nsw', False),
+            'is_single_event': result.get('is_single_event', True)
         }
 
     except json.JSONDecodeError as e:
@@ -232,7 +234,8 @@ def synthesise_cluster(cluster: list) -> dict:
             'briefing': '',
             'is_noise': True,
             'is_australia': False,
-            'is_nsw': False
+            'is_nsw': False,
+            'is_single_event': True
         }
     except Exception as e:
         print(f"Haiku synthesis error: {e}")
@@ -242,7 +245,8 @@ def synthesise_cluster(cluster: list) -> dict:
             'briefing': '',
             'is_noise': True,
             'is_australia': False,
-            'is_nsw': False
+            'is_nsw': False,
+            'is_single_event': True
         }
 
 

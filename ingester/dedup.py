@@ -1,3 +1,4 @@
+import re
 import hashlib
 from simhash import Simhash
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -5,6 +6,19 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 CLUSTER_SIMILARITY_THRESHOLD = 0.35
 MAX_CLUSTER_SIZE = 5
+
+# Second-pass meta-clustering — see group_clusters_for_merge()
+CATEGORY_OVERLAP_MIN_WORDS = 2
+# Empirically calibrated: fitting TF-IDF on a handful of realistic
+# 4-bullet Haiku briefings, genuinely same-event pairs scored ~0.15-0.17
+# cosine similarity, unrelated pairs ~0.01-0.06. 0.3 (the first guess)
+# never fires in practice — briefings are short relative to vocabulary
+# size, so absolute scores run much lower than intuition suggests.
+BRIEFING_SIMILARITY_THRESHOLD = 0.12
+CATEGORY_STOPWORDS = {
+    'the', 'a', 'an', 'of', 'in', 'on', 'for', 'and', 'to',
+    'with', 'its', 'new', 'over', 'after', 'as', 'at',
+}
 
 
 def compute_url_hash(url: str) -> str:
@@ -197,3 +211,113 @@ def cluster_articles(
         clusters.append(group)
 
     return clusters
+
+
+def _category_words(category: str) -> set:
+    words = re.findall(r"[a-z0-9']+", category.lower())
+    return {w for w in words if w not in CATEGORY_STOPWORDS}
+
+
+def categories_overlap(
+    category_a: str,
+    category_b: str,
+    min_words: int = CATEGORY_OVERLAP_MIN_WORDS
+) -> bool:
+    """
+    Two category labels signal the same story if they're an exact
+    case-insensitive match, or share at least min_words significant
+    words after stopword removal. Requiring >=2 shared words (rather
+    than just 1) avoids false positives like "Iran" alone matching
+    unrelated Iran stories (nuclear talks vs. an earthquake).
+    """
+    a = category_a.strip().lower()
+    b = category_b.strip().lower()
+    if a and a == b:
+        return True
+    return len(_category_words(category_a) & _category_words(category_b)) >= min_words
+
+
+def group_clusters_for_merge(clusters: list, max_sources: int = MAX_CLUSTER_SIZE) -> list:
+    """
+    Second-pass meta-clustering — groups already-synthesised clusters
+    (from cluster_articles() + synthesise_cluster()) that describe the
+    same story event but weren't grouped by the first TF-IDF pass on
+    raw article bodies (common with short, sparse Tavily snippets).
+
+    Two independent merge signals, checked pairwise:
+      - category overlap: exact match, or >=2 shared significant words
+      - briefing similarity: cosine similarity over Haiku-normalised
+        briefing text, fit once across all clusters passed in (richer
+        corpus than a 2-document pairwise fit, which under-discriminates)
+
+    Either signal alone is enough to flag a candidate pair — but a pair
+    must also share the same tab. Cross-tab pairs never merge.
+
+    Non-transitive by design: a candidate only joins a forming group if
+    it pairwise-matches EVERY existing member (a clique requirement),
+    not just one member via a chain. This avoids the "A matches B, B
+    matches C, but A doesn't match C" trap that a union-find/connected-
+    components approach would fall into — important here because
+    category/briefing overlap is a weaker signal than the first pass's
+    direct TF-IDF on full article bodies. The tradeoff: a genuine 3+
+    way match can fragment into smaller groups if the weakest pairwise
+    link falls just under threshold — accepted in exchange for never
+    merging unrelated stories transitively.
+
+    Each cluster dict must include 'tab', 'category', 'briefing', and
+    'source_count' (used to enforce max_sources across the merged
+    group, same cap as the first pass).
+
+    Returns a list of groups, each a list of the original cluster
+    dicts. Clusters with no match return as singleton groups (len 1)
+    — callers should skip those, only merging groups of 2+.
+    """
+    n = len(clusters)
+    if n == 0:
+        return []
+    if n == 1:
+        return [clusters]
+
+    briefings = [c.get('briefing', '') for c in clusters]
+    try:
+        vectorizer = TfidfVectorizer(
+            stop_words='english',
+            max_features=1000,
+            ngram_range=(1, 2)
+        )
+        tfidf_matrix = vectorizer.fit_transform(briefings)
+        briefing_similarity = cosine_similarity(tfidf_matrix)
+    except Exception:
+        briefing_similarity = [[0.0] * n for _ in range(n)]
+
+    def matches(i: int, j: int) -> bool:
+        if clusters[i].get('tab') != clusters[j].get('tab'):
+            return False
+        if categories_overlap(clusters[i].get('category', ''), clusters[j].get('category', '')):
+            return True
+        return briefing_similarity[i][j] >= BRIEFING_SIMILARITY_THRESHOLD
+
+    used = [False] * n
+    groups = []
+
+    for i in range(n):
+        if used[i]:
+            continue
+        group_idx = [i]
+        used[i] = True
+        total_sources = clusters[i].get('source_count', 1)
+
+        for j in range(n):
+            if used[j] or i == j:
+                continue
+            candidate_sources = clusters[j].get('source_count', 1)
+            if total_sources + candidate_sources > max_sources:
+                continue
+            if all(matches(j, k) for k in group_idx):
+                group_idx.append(j)
+                used[j] = True
+                total_sources += candidate_sources
+
+        groups.append([clusters[k] for k in group_idx])
+
+    return groups
