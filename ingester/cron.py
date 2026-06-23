@@ -40,6 +40,24 @@ BORDERLINE_MIN = -4
 BLOCK_THRESHOLD = -5
 
 
+def resolve_tab_override(tab: str, sources: list) -> str:
+    """
+    Apply forced-tab overrides (e.g. Financial Times -> finance) only
+    when Haiku classified the cluster as top_stories AND every source
+    in the cluster shares that same forced tab (e.g. all-FT, no other
+    outlet mixed in). If Haiku already chose a more specific tab
+    (geopolitics, finance, ai_tech, etc.) that decision stands — a
+    cluster with FT sources can still genuinely be geopolitics. If any
+    source lacks a forced tab, the mix is trusted over the override.
+    """
+    if tab != 'top_stories':
+        return tab
+    forced_tabs = {s.get('forced_tab') for s in sources}
+    if len(forced_tabs) == 1 and None not in forced_tabs:
+        return forced_tabs.pop()
+    return tab
+
+
 def run_cron():
     """
     Main cron job entry point.
@@ -209,16 +227,13 @@ def run_cron():
                         print(f"  -> NOISE — skipping")
                         continue
 
-                    # Forced-tab sources (e.g. Financial Times → finance)
-                    # override whatever tab Haiku assigned the cluster
-                    forced_tab = next(
-                        (s['forced_tab'] for s in cluster if s.get('forced_tab')),
-                        None
-                    )
-                    final_tab = forced_tab or synthesis['tab']
-                    if forced_tab and forced_tab != synthesis['tab']:
+                    # Forced-tab override only applies when Haiku said
+                    # top_stories AND every source shares the same forced
+                    # tab (e.g. all-FT) — see resolve_tab_override()
+                    final_tab = resolve_tab_override(synthesis['tab'], cluster)
+                    if final_tab != synthesis['tab']:
                         print(f"  -> TAB OVERRIDE: Haiku said {synthesis['tab']}, "
-                              f"forced to {forced_tab}")
+                              f"forced to {final_tab}")
 
                     top_score = max(s.get('keyword_score', 0) for s in cluster)
                     cluster_row = {
@@ -293,11 +308,7 @@ def run_cron():
                             print(f"  -> MERGE REJECTED (not single event) — keeping originals")
                             continue
 
-                        forced_tab = next(
-                            (s['forced_tab'] for s in combined_sources if s.get('forced_tab')),
-                            None
-                        )
-                        final_merge_tab = forced_tab or resynth['tab']
+                        final_merge_tab = resolve_tab_override(resynth['tab'], combined_sources)
                         top_score = max(s.get('keyword_score', 0) for s in combined_sources)
 
                         merged_row = {
