@@ -10,12 +10,31 @@ supabase: Client = create_client(
 )
 
 
+def _fetch_all(table_name: str, select_cols: str, order_col: str = None, page_size: int = 1000) -> list:
+    """
+    Fetch every row from a table, paginating past PostgREST's default
+    row cap (1000 per request) instead of silently truncating.
+    """
+    rows = []
+    offset = 0
+    while True:
+        query = supabase.table(table_name).select(select_cols)
+        if order_col:
+            query = query.order(order_col, desc=True)
+        batch = query.range(offset, offset + page_size - 1).execute().data
+        rows.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+    return rows
+
+
 # ─── URL Hash Operations ───────────────────────────────────────────────────────
 
 def get_existing_url_hashes() -> list:
     """Fetch all known URL hashes from last 7 days."""
-    response = supabase.table('url_hashes').select('url_hash').execute()
-    return [row['url_hash'] for row in response.data]
+    rows = _fetch_all('url_hashes', 'url_hash', order_col='seen_at')
+    return [row['url_hash'] for row in rows]
 
 
 def insert_url_hash(url_hash: str):
@@ -32,18 +51,8 @@ def insert_url_hash(url_hash: str):
 
 def get_existing_simhashes() -> list:
     """Fetch all title simhashes for near-duplicate detection."""
-    response = (
-        supabase.table('articles')
-        .select('title_simhash')
-        .order('ingested_at', desc=True)
-        .limit(200)
-        .execute()
-    )
-    return [
-        row['title_simhash']
-        for row in response.data
-        if row['title_simhash']
-    ]
+    rows = _fetch_all('articles', 'title_simhash', order_col='ingested_at')
+    return [row['title_simhash'] for row in rows if row['title_simhash']]
 
 
 def insert_article(article: dict) -> dict:
@@ -125,18 +134,12 @@ def cleanup_old_articles():
 
 def get_existing_cluster_titles() -> list:
     """
-    Fetch recent cluster_sources titles for Gate 2 SimHash comparison.
+    Fetch all cluster_sources titles for Gate 2 SimHash comparison.
     Simhash is recomputed on the fly from these — cluster_sources has no
     title_simhash column of its own.
     """
-    response = (
-        supabase.table('cluster_sources')
-        .select('title')
-        .order('published_at', desc=True)
-        .limit(500)
-        .execute()
-    )
-    return [row['title'] for row in response.data if row['title']]
+    rows = _fetch_all('cluster_sources', 'title', order_col='published_at')
+    return [row['title'] for row in rows if row['title']]
 
 
 def insert_story_cluster(cluster: dict) -> dict:
