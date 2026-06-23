@@ -1,16 +1,17 @@
 import streamlit as st
 from dotenv import load_dotenv
 from db.queries import (
-    get_articles_by_tab_paginated,
+    get_story_clusters_by_tab_paginated,
     get_analysis,
+    get_cluster_quick_analysis,
     get_last_cron_run,
     get_borderline_articles,
     get_recent_cron_runs,
     get_borderline_analysis
 )
-from components.article_card import render_article_card
+from components.briefing_card import render_briefing_card
 from components.analysis_panel import render_analysis_panel
-from agents.crew import run_analysis_crew, run_quick_analysis_crew
+from agents.crew import run_analysis_crew, run_quick_analysis_crew, run_cluster_quick_analysis_crew
 from components.run_dashboard import render_run_dashboard
 from ingester.cron import run_cron
 
@@ -87,7 +88,7 @@ TAB_LABELS = {
 
 tabs = st.tabs(list(TABS.keys()))
 
-# ─── Genuine tabs ─────────────────────────────────────────────────────────────
+# ─── Genuine tabs — one briefing card per story cluster ───────────────────────
 
 for tab_ui, (tab_label, tab_key) in zip(tabs[:6], list(TABS.items())[:6]):
     with tab_ui:
@@ -96,28 +97,31 @@ for tab_ui, (tab_label, tab_key) in zip(tabs[:6], list(TABS.items())[:6]):
         if offset_key not in st.session_state:
             st.session_state[offset_key] = 0
 
-        articles = get_articles_by_tab_paginated(
+        clusters = get_story_clusters_by_tab_paginated(
             tab=tab_key,
             limit=10,
             offset=st.session_state[offset_key]
         )
 
-        if not articles:
-            st.info(f"No articles yet for {tab_label}. Run the cron job to populate.")
+        if not clusters:
+            st.info(f"No stories yet for {tab_label}. Run the cron job to populate.")
         else:
             st.caption(
-                f"Showing {len(articles)} articles · "
+                f"Showing {len(clusters)} stories · "
                 f"Page {st.session_state[offset_key] // 10 + 1}"
             )
 
-            for article in articles:
-                article_id = article['id']
-                render_article_card(article, latest_run_id=latest_run_id)
+            for cluster in clusters:
+                cluster_id = cluster['id']
+                sources = cluster.get('sources', [])
+                lead_title = sources[0]['title'] if sources else cluster.get('category', 'Untitled story')
+
+                render_briefing_card(cluster, latest_run_id=latest_run_id)
 
                 # Quick Analysis — Haiku
-                quick_key = f"quick_{article_id}"
+                quick_key = f"quick_{cluster_id}"
                 if st.session_state.get(quick_key):
-                    existing_quick = get_borderline_analysis(article_id)
+                    existing_quick = get_cluster_quick_analysis(cluster_id)
                     if existing_quick:
                         verdict = existing_quick.get('bias_direction', 'borderline')
                         summary = existing_quick.get('context_summary', '')
@@ -130,11 +134,10 @@ for tab_ui, (tab_label, tab_key) in zip(tabs[:6], list(TABS.items())[:6]):
                             st.info(f"🔶 Borderline — {summary}")
                     else:
                         with st.spinner("Running quick analysis with Haiku..."):
-                            quick_analysis = run_quick_analysis_crew(
-                                article_id=article_id,
-                                title=article.get('title', ''),
-                                body=article.get('clean_body', '') or article.get('summary', ''),
-                                source_name=article.get('source_name', '')
+                            quick_analysis = run_cluster_quick_analysis_crew(
+                                cluster_id=cluster_id,
+                                title=lead_title,
+                                sources=sources
                             )
                         if quick_analysis:
                             verdict = quick_analysis.get('bias_direction', 'borderline')
@@ -150,18 +153,17 @@ for tab_ui, (tab_label, tab_key) in zip(tabs[:6], list(TABS.items())[:6]):
                             st.error("Quick analysis failed.")
 
                 # Deep Analysis — Sonnet
-                analyse_key = f"analyse_{article_id}"
+                analyse_key = f"analyse_{cluster_id}"
                 if st.session_state.get(analyse_key):
-                    existing = get_analysis(article_id)
+                    existing = get_analysis(cluster_id)
                     if existing:
                         render_analysis_panel(existing)
                     else:
                         with st.spinner("Running deep analysis with Claude Sonnet..."):
                             analysis = run_analysis_crew(
-                                article_id=article_id,
-                                title=article.get('title', ''),
-                                body=article.get('clean_body', '') or article.get('summary', ''),
-                                source_name=article.get('source_name', '')
+                                cluster_id=cluster_id,
+                                title=lead_title,
+                                sources=sources
                             )
                         if analysis:
                             render_analysis_panel(analysis)
@@ -182,11 +184,11 @@ for tab_ui, (tab_label, tab_key) in zip(tabs[:6], list(TABS.items())[:6]):
                 st.caption(
                     f"Page {current_page} · "
                     f"showing {st.session_state[offset_key] + 1}–"
-                    f"{st.session_state[offset_key] + len(articles)}"
+                    f"{st.session_state[offset_key] + len(clusters)}"
                 )
 
             with col3:
-                if len(articles) == 10:
+                if len(clusters) == 10:
                     if st.button("Next 10 ➡️", key=f"next_{tab_key}"):
                         st.session_state[offset_key] += 10
                         st.rerun()

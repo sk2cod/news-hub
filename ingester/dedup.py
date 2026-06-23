@@ -2,7 +2,9 @@ import hashlib
 from simhash import Simhash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from ingester.preprocessor import detect_development_signals
+
+CLUSTER_SIMILARITY_THRESHOLD = 0.5
+MAX_CLUSTER_SIZE = 5
 
 
 def compute_url_hash(url: str) -> str:
@@ -73,20 +75,19 @@ def compute_tfidf_similarity(
 def check_duplicate(
     url: str,
     title: str,
-    body: str,
     existing_url_hashes: list,
-    existing_simhashes: list,
-    existing_articles: list
+    existing_simhashes: list
 ) -> dict:
     """
-    Run all three dedup gates against a new article.
+    Run Gate 1 (URL hash) and Gate 2 (SimHash) against a new article.
+    Gate 3 (TF-IDF) is no longer a per-article drop/keep decision in v2.0 —
+    see cluster_articles() for story-level grouping instead.
 
     Returns a dict with:
-        action: 'drop' | 'keep' | 'update'
+        action: 'drop' | 'keep'
         reason: explanation string
         url_hash: computed hash for storage
         title_simhash: computed simhash for storage
-        parent_story_id: UUID if action is 'update', else None
     """
     url_hash = compute_url_hash(url)
     title_simhash = compute_title_simhash(title)
@@ -97,8 +98,7 @@ def check_duplicate(
             'action': 'drop',
             'reason': 'exact URL duplicate',
             'url_hash': url_hash,
-            'title_simhash': title_simhash,
-            'parent_story_id': None
+            'title_simhash': title_simhash
         }
 
     # Gate 2 — near-duplicate headline
@@ -107,63 +107,93 @@ def check_duplicate(
             'action': 'drop',
             'reason': 'near-duplicate headline',
             'url_hash': url_hash,
-            'title_simhash': title_simhash,
-            'parent_story_id': None
+            'title_simhash': title_simhash
         }
 
-    # Gate 3 — TF-IDF cosine similarity
-    if existing_articles:
-        existing_texts = [
-            a['title'] + ' ' + a.get('clean_body', '')
-            for a in existing_articles
-        ]
-        new_text = title + ' ' + body
-        similarity = compute_tfidf_similarity(new_text, existing_texts)
-
-        # High similarity — check for new developments
-        if similarity > 0.85:
-            for article in existing_articles:
-                article_similarity = compute_tfidf_similarity(
-                    new_text,
-                    [article['title'] + ' ' + article.get('clean_body', '')]
-                )
-                if article_similarity > 0.85:
-                    has_development = detect_development_signals(
-                        title, body,
-                        article['title'],
-                        article.get('clean_body', '')
-                    )
-                    if has_development:
-                        return {
-                            'action': 'update',
-                            'reason': 'story development detected',
-                            'url_hash': url_hash,
-                            'title_simhash': title_simhash,
-                            'parent_story_id': article['id']
-                        }
-            return {
-                'action': 'drop',
-                'reason': 'duplicate story no new developments',
-                'url_hash': url_hash,
-                'title_simhash': title_simhash,
-                'parent_story_id': None
-            }
-
-        # Related but distinct story
-        if 0.60 <= similarity <= 0.85:
-            return {
-                'action': 'keep',
-                'reason': 'related but distinct story',
-                'url_hash': url_hash,
-                'title_simhash': title_simhash,
-                'parent_story_id': None
-            }
-
-    # Passed all gates — new story
     return {
         'action': 'keep',
-        'reason': 'new story',
+        'reason': 'new article',
         'url_hash': url_hash,
-        'title_simhash': title_simhash,
-        'parent_story_id': None
+        'title_simhash': title_simhash
     }
+
+
+def cluster_articles(
+    articles: list,
+    similarity_threshold: float = CLUSTER_SIMILARITY_THRESHOLD,
+    max_cluster_size: int = MAX_CLUSTER_SIZE
+) -> list:
+    """
+    Gate 3 — group articles covering the same story event into clusters.
+
+    Articles are compared pairwise via TF-IDF cosine similarity over
+    title + clean_body. Any pair scoring >= similarity_threshold is
+    joined into the same cluster (transitively, via union-find), so a
+    cluster can contain articles that aren't all pairwise similar as
+    long as they're chained together by shared neighbours.
+
+    similarity >= 0.5  → same story, grouped
+    similarity < 0.5   → different story, stays in its own cluster
+
+    Clusters larger than max_cluster_size keep only the top N articles
+    by keyword_score (highest first).
+
+    Returns a list of clusters, each a list of article dicts.
+    """
+    if not articles:
+        return []
+
+    n = len(articles)
+    if n == 1:
+        return [articles]
+
+    texts = [
+        a.get('title', '') + ' ' + a.get('clean_body', a.get('body', ''))
+        for a in articles
+    ]
+
+    try:
+        vectorizer = TfidfVectorizer(
+            stop_words='english',
+            max_features=1000,
+            ngram_range=(1, 2)
+        )
+        tfidf_matrix = vectorizer.fit_transform(texts)
+        similarity_matrix = cosine_similarity(tfidf_matrix)
+    except Exception:
+        return [[a] for a in articles]
+
+    # Union-find to group articles transitively by similarity
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            i = parent[i]
+        return i
+
+    def union(i, j):
+        root_i, root_j = find(i), find(j)
+        if root_i != root_j:
+            parent[root_i] = root_j
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            if similarity_matrix[i][j] >= similarity_threshold:
+                union(i, j)
+
+    groups = {}
+    for i in range(n):
+        root = find(i)
+        groups.setdefault(root, []).append(articles[i])
+
+    clusters = []
+    for group in groups.values():
+        if len(group) > max_cluster_size:
+            group = sorted(
+                group,
+                key=lambda a: a.get('keyword_score', 0),
+                reverse=True
+            )[:max_cluster_size]
+        clusters.append(group)
+
+    return clusters

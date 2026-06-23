@@ -30,21 +30,6 @@ def insert_url_hash(url_hash: str):
 
 # ─── Article Operations ────────────────────────────────────────────────────────
 
-def get_existing_articles_for_dedup() -> list:
-    """
-    Fetch recent articles needed for SimHash and TF-IDF comparison.
-    Returns id, title, clean_body, and title_simhash.
-    """
-    response = (
-        supabase.table('articles')
-        .select('id, title, summary, title_simhash')
-        .order('ingested_at', desc=True)
-        .limit(200)
-        .execute()
-    )
-    return response.data
-
-
 def get_existing_simhashes() -> list:
     """Fetch all title simhashes for near-duplicate detection."""
     response = (
@@ -136,17 +121,112 @@ def cleanup_old_articles():
     supabase.rpc('cleanup_old_articles', {}).execute()
 
 
+# ─── Story Cluster Operations ──────────────────────────────────────────────────
+
+def get_existing_cluster_titles() -> list:
+    """
+    Fetch recent cluster_sources titles for Gate 2 SimHash comparison.
+    Simhash is recomputed on the fly from these — cluster_sources has no
+    title_simhash column of its own.
+    """
+    response = (
+        supabase.table('cluster_sources')
+        .select('title')
+        .order('published_at', desc=True)
+        .limit(500)
+        .execute()
+    )
+    return [row['title'] for row in response.data if row['title']]
+
+
+def insert_story_cluster(cluster: dict) -> dict:
+    """
+    Insert a synthesised story cluster.
+    Returns the inserted row including generated id.
+    """
+    response = (
+        supabase.table('story_clusters')
+        .insert(cluster)
+        .execute()
+    )
+    return response.data[0] if response.data else {}
+
+
+def insert_cluster_source(source: dict) -> dict:
+    """Insert one source article belonging to a story cluster."""
+    response = (
+        supabase.table('cluster_sources')
+        .insert(source)
+        .execute()
+    )
+    return response.data[0] if response.data else {}
+
+
+def get_story_clusters_by_tab_paginated(
+    tab: str,
+    limit: int = 10,
+    offset: int = 0
+) -> list:
+    """
+    Fetch story clusters with their source articles embedded,
+    paginated for the 'Load next 10' button.
+    Excludes borderline clusters — borderline articles are stored
+    directly in the articles table, never clustered.
+    """
+    response = (
+        supabase.table('story_clusters')
+        .select('*, cluster_sources(*)')
+        .eq('tab', tab)
+        .eq('is_borderline', False)
+        .order('ingested_at', desc=True)
+        .range(offset, offset + limit - 1)
+        .execute()
+    )
+    clusters = response.data
+    for cluster in clusters:
+        cluster['sources'] = cluster.pop('cluster_sources', [])
+    return clusters
+
+
+def get_cluster_quick_analysis(cluster_id: str) -> dict:
+    """
+    Fetch Haiku quick analysis for a story cluster (genuine tabs).
+    Excludes Sonnet deep analysis results.
+    """
+    response = (
+        supabase.table('analysis_results')
+        .select('*')
+        .eq('cluster_id', cluster_id)
+        .eq('model_used', 'claude-haiku-4-5')
+        .execute()
+    )
+    return response.data[0] if response.data else {}
+
+
+def insert_cluster_quick_analysis(analysis: dict) -> dict:
+    """
+    Save Haiku quick analysis for a story cluster.
+    Uses upsert to handle re-analysis gracefully.
+    """
+    response = (
+        supabase.table('analysis_results')
+        .upsert(analysis, on_conflict='cluster_id')
+        .execute()
+    )
+    return response.data[0] if response.data else {}
+
+
 # ─── Analysis Operations ───────────────────────────────────────────────────────
 
-def get_analysis(article_id: str) -> dict:
+def get_analysis(cluster_id: str) -> dict:
     """
-    Fetch Sonnet deep analysis only.
+    Fetch Sonnet deep analysis for a story cluster.
     Excludes Haiku quick analysis results.
     """
     response = (
         supabase.table('analysis_results')
         .select('*')
-        .eq('article_id', article_id)
+        .eq('cluster_id', cluster_id)
         .eq('model_used', 'claude-sonnet-4-5')
         .execute()
     )
@@ -155,12 +235,12 @@ def get_analysis(article_id: str) -> dict:
 
 def insert_analysis(analysis: dict) -> dict:
     """
-    Save Sonnet deep analysis result to database.
+    Save Sonnet deep analysis result for a story cluster.
     Uses upsert to handle re-analysis gracefully.
     """
     response = (
         supabase.table('analysis_results')
-        .upsert(analysis, on_conflict='article_id')
+        .upsert(analysis, on_conflict='cluster_id')
         .execute()
     )
     return response.data[0] if response.data else {}

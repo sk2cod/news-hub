@@ -1,17 +1,19 @@
 import os
 from dotenv import load_dotenv
 from ingester.fetcher import fetch_all_articles
-from ingester.dedup import check_duplicate
+from ingester.dedup import check_duplicate, cluster_articles, compute_title_simhash
 from ingester.preprocessor import preprocess_article
 from ingester.keyword_scores import score_article
 from ingester.budget_guard import reset_usage, print_usage_summary, get_usage_summary
-from agents.crew import run_classification_crew
+from agents.classifier_agent import synthesise_batch
 from db.queries import (
     get_existing_url_hashes,
     get_existing_simhashes,
-    get_existing_articles_for_dedup,
+    get_existing_cluster_titles,
     insert_article,
     insert_url_hash,
+    insert_story_cluster,
+    insert_cluster_source,
     cleanup_old_articles,
     start_cron_run,
     finish_cron_run
@@ -27,10 +29,17 @@ BLOCK_THRESHOLD = -5
 def run_cron():
     """
     Main cron job entry point.
-    Three-tier article routing:
-      score >= 0    → Haiku classification → genuine tabs
-      score -4 to -1 → stored as borderline, shown raw in borderline tab
-      score <= -5   → blocked completely
+
+    Pipeline:
+      1. Fetch articles (RSS + Tavily)
+      2. Gate 1 + Gate 2 dedup (URL hash + SimHash) per article
+      3. Keyword scoring and routing (block / borderline / haiku queue)
+      4. cluster_articles() groups the haiku queue into story clusters
+      5. synthesise_batch() sends clusters to Haiku for one briefing each
+      6. Store one row per cluster in story_clusters
+      7. Store individual source articles in cluster_sources
+      8. finish_cron_run() with token usage
+      9. cleanup_old_articles() — 7-day TTL
     """
     print("\n========================================")
     print("NEWS HUB CRON JOB STARTING")
@@ -42,6 +51,10 @@ def run_cron():
     articles_fetched = 0
     articles_dropped = 0
     articles_stored = 0
+    borderline_queue = []
+    haiku_queue = []
+    clusters = []
+    synthesised = []
 
     try:
         # Step 1 — Fetch all raw articles
@@ -49,19 +62,19 @@ def run_cron():
         articles_fetched = len(raw_articles)
         print(f"\nFetched: {articles_fetched} raw articles")
 
-        # Step 2 — Load existing data for dedup
+        # Step 2 — Load existing data for Gate 1 + Gate 2 dedup
         print("\nLoading existing data for dedup...")
         existing_url_hashes = get_existing_url_hashes()
         existing_simhashes = get_existing_simhashes()
-        existing_articles = get_existing_articles_for_dedup()
+        existing_simhashes += [
+            compute_title_simhash(title)
+            for title in get_existing_cluster_titles()
+        ]
         print(f"Loaded {len(existing_url_hashes)} url hashes")
         print(f"Loaded {len(existing_simhashes)} simhashes")
-        print(f"Loaded {len(existing_articles)} recent articles")
 
-        # Step 3 — Dedup + score + route
+        # Step 3 — Gate 1 + Gate 2 dedup, then keyword scoring and routing
         print("\n--- Running dedup, scoring and routing ---")
-        haiku_queue = []
-        borderline_queue = []
 
         for article in raw_articles:
             title = article.get('title', '')
@@ -73,23 +86,12 @@ def run_cron():
                 articles_dropped += 1
                 continue
 
-            # Keyword score
-            score = score_article(title, body, tab)
-
-            # Block completely
-            if score <= BLOCK_THRESHOLD:
-                articles_dropped += 1
-                print(f"BLOCKED (score={score}): {title[:60]}")
-                continue
-
-            # Dedup gates
+            # Gate 1 + Gate 2
             dedup_result = check_duplicate(
                 url=url,
                 title=title,
-                body=body,
                 existing_url_hashes=existing_url_hashes,
-                existing_simhashes=existing_simhashes,
-                existing_articles=existing_articles
+                existing_simhashes=existing_simhashes
             )
 
             if dedup_result['action'] == 'drop':
@@ -97,35 +99,39 @@ def run_cron():
                 print(f"DEDUP DROP ({dedup_result['reason']}): {title[:60]}")
                 continue
 
-            # Update in-memory dedup lists
+            # Update in-memory dedup lists so later articles in this batch
+            # dedup against ones already seen earlier in the same run
             existing_url_hashes.append(dedup_result['url_hash'])
             existing_simhashes.append(dedup_result['title_simhash'])
 
-            # Route to borderline or Haiku queue
+            # Keyword score
+            score = score_article(title, body, tab)
+
+            if score <= BLOCK_THRESHOLD:
+                articles_dropped += 1
+                print(f"BLOCKED (score={score}): {title[:60]}")
+                continue
+
+            article['keyword_score'] = score
+            article['url_hash'] = dedup_result['url_hash']
+            article['title_simhash'] = dedup_result['title_simhash']
+
             if score <= -1:
-                article['keyword_score'] = score
-                article['url_hash'] = dedup_result['url_hash']
-                article['title_simhash'] = dedup_result['title_simhash']
-                article['parent_story_id'] = dedup_result.get('parent_story_id')
                 article['is_borderline'] = True
                 borderline_queue.append(article)
                 print(f"BORDERLINE (score={score}): {title[:60]}")
             else:
                 preprocessed = preprocess_article(title, body)
-                article['structured_input'] = preprocessed['structured_input']
                 article['clean_body'] = preprocessed['clean_body']
-                article['url_hash'] = dedup_result['url_hash']
-                article['title_simhash'] = dedup_result['title_simhash']
-                article['parent_story_id'] = dedup_result.get('parent_story_id')
                 article['is_borderline'] = False
-                article['keyword_score'] = score
                 haiku_queue.append(article)
 
-        print(f"\nHaiku queue:     {len(haiku_queue)} articles")
+        print(f"\nHaiku queue:      {len(haiku_queue)} articles")
         print(f"Borderline queue: {len(borderline_queue)} articles")
         print(f"Blocked/dropped:  {articles_dropped}")
 
-        # Step 4 — Store borderline articles directly (no Haiku)
+        # Borderline articles bypass clustering and Haiku entirely —
+        # stored directly, raw, in the legacy articles table
         print("\n--- Storing borderline articles ---")
         for article in borderline_queue:
             try:
@@ -143,7 +149,6 @@ def run_cron():
                     'published_at': article.get('published_at'),
                     'is_australia': False,
                     'is_nsw': False,
-                    'parent_story_id': article.get('parent_story_id'),
                     'is_borderline': True,
                     'keyword_score': article.get('keyword_score', 0),
                     'category': '',
@@ -156,56 +161,64 @@ def run_cron():
                 articles_dropped += 1
                 print(f"BORDERLINE STORE ERROR: {e}")
 
-        # Step 5 — Haiku classification
         if haiku_queue:
-            print("\n--- Running Haiku classification ---")
-            classified_articles = run_classification_crew(haiku_queue)
+            # Step 4 — Cluster the haiku queue into story clusters
+            print("\n--- Clustering haiku queue into stories ---")
+            clusters = cluster_articles(haiku_queue)
+            print(f"Grouped {len(haiku_queue)} articles into {len(clusters)} clusters")
 
-            # Step 6 — Store classified articles
-            print("\n--- Storing classified articles ---")
-            for article in classified_articles:
+            # Step 5 — Synthesise each cluster into one briefing
+            print("\n--- Running Haiku synthesis ---")
+            synthesised = synthesise_batch(clusters)
+
+            # Step 6 + 7 — Store one row per cluster, one row per source
+            print("\n--- Storing clusters and sources ---")
+            for cluster in synthesised:
+                sources = cluster['sources']
                 try:
-                    insert_url_hash(article['url_hash'])
-                    row = {
-                        'url_hash': article['url_hash'],
-                        'title_simhash': article['title_simhash'],
-                        'tab': article['tab'],
-                        'title': article['title'][:512],
-                        'summary': article.get('summary', ''),
-                        'url': article['url'],
-                        'source_id': article.get('source_id'),
-                        'source_name': article.get('source_name', ''),
-                        'source_country': article.get('source_country', 'GLOBAL'),
-                        'published_at': article.get('published_at'),
-                        'is_australia': article.get('is_australia', False),
-                        'is_nsw': article.get('is_nsw', False),
-                        'parent_story_id': article.get('parent_story_id'),
-                        'is_borderline': False,
-                        'keyword_score': article.get('keyword_score', 0),
-                        'category': article.get('category', ''),
+                    top_score = max(s.get('keyword_score', 0) for s in sources)
+                    cluster_row = {
+                        'tab': cluster['tab'],
+                        'category': cluster.get('category', ''),
+                        'briefing': cluster.get('briefing', ''),
+                        'keyword_score': top_score,
                         'cron_run_id': run_id,
-                        'clean_body': article.get('clean_body', ''),
+                        'is_borderline': False,
                     }
-                    insert_article(row)
-                    articles_stored += 1
-                    print(f"STORED [{article['tab']}]: {article['title'][:60]}")
+                    stored_cluster = insert_story_cluster(cluster_row)
+                    cluster_id = stored_cluster['id']
+
+                    for source in sources:
+                        insert_url_hash(source['url_hash'])
+                        insert_cluster_source({
+                            'cluster_id': cluster_id,
+                            'title': source['title'][:512],
+                            'url': source['url'],
+                            'url_hash': source['url_hash'],
+                            'source_name': source.get('source_name', ''),
+                            'source_country': source.get('source_country', 'GLOBAL'),
+                            'published_at': source.get('published_at'),
+                            'clean_body': source.get('clean_body', ''),
+                        })
+
+                    articles_stored += len(sources)
+                    print(f"CLUSTER STORED [{cluster['tab']}] "
+                          f"({len(sources)} sources): {cluster.get('category', '')}")
                 except Exception as e:
-                    articles_dropped += 1
-                    print(f"STORE ERROR: {e}")
+                    articles_dropped += len(sources)
+                    print(f"CLUSTER STORE ERROR: {e}")
         else:
             print("\nNo articles for Haiku this run")
 
-        # Step 7 — Cleanup old articles
-        print("\n--- Running 7-day TTL cleanup ---")
-        cleanup_old_articles()
+        # Step 8 — Final summary + finish_cron_run with token usage
+        noise_dropped = len(haiku_queue) - sum(len(c['sources']) for c in synthesised)
 
-        # Step 8 — Final summary
         print("\n========================================")
         print(f"CRON JOB COMPLETE")
         print(f"Fetched:      {articles_fetched}")
         print(f"Dropped:      {articles_dropped}")
         print(f"Stored:       {articles_stored}")
-        print(f"  Genuine:    {len(classified_articles) if haiku_queue else 0}")
+        print(f"  Clusters:   {len(synthesised)}")
         print(f"  Borderline: {len(borderline_queue)}")
         print("========================================\n")
         print_usage_summary()
@@ -223,12 +236,17 @@ def run_cron():
             sonnet_output_tokens=usage['sonnet_output_tokens'],
             total_cost_usd=usage['total_cost_usd'],
             borderline_stored=len(borderline_queue),
-            noise_dropped=len(haiku_queue) - len(classified_articles) if haiku_queue else 0
+            noise_dropped=noise_dropped
         )
+
+        # Step 9 — Cleanup old articles/clusters (7-day TTL)
+        print("\n--- Running 7-day TTL cleanup ---")
+        cleanup_old_articles()
 
     except Exception as e:
         print(f"\nCRON JOB FAILED: {e}")
         usage = get_usage_summary()
+        noise_dropped = len(haiku_queue) - sum(len(c['sources']) for c in synthesised)
         finish_cron_run(
             run_id,
             articles_fetched,
@@ -242,7 +260,7 @@ def run_cron():
             sonnet_output_tokens=usage['sonnet_output_tokens'],
             total_cost_usd=usage['total_cost_usd'],
             borderline_stored=len(borderline_queue),
-            noise_dropped=len(haiku_queue) - len(classified_articles) if haiku_queue else 0
+            noise_dropped=noise_dropped
         )
         raise
 
