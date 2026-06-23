@@ -1,11 +1,12 @@
 import os
+import sys
 from dotenv import load_dotenv
 from ingester.fetcher import fetch_all_articles
 from ingester.dedup import check_duplicate, cluster_articles, compute_title_simhash
 from ingester.preprocessor import preprocess_article
 from ingester.keyword_scores import score_article
 from ingester.budget_guard import reset_usage, print_usage_summary, get_usage_summary
-from agents.classifier_agent import synthesise_batch
+from agents.classifier_agent import synthesise_cluster
 from db.queries import (
     get_existing_url_hashes,
     get_existing_simhashes,
@@ -21,6 +22,12 @@ from db.queries import (
 
 load_dotenv()
 
+# Fetched article titles can contain arbitrary emoji/unicode that the
+# console's default codepage (cp1252 on Windows) can't encode — without
+# this, a single odd character in any of 300+ fetched titles crashes
+# the whole run on a print() call.
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 HAIKU_THRESHOLD = 0
 BORDERLINE_MIN = -4
 BLOCK_THRESHOLD = -5
@@ -35,9 +42,10 @@ def run_cron():
       2. Gate 1 + Gate 2 dedup (URL hash + SimHash) per article
       3. Keyword scoring and routing (block / borderline / haiku queue)
       4. cluster_articles() groups the haiku queue into story clusters
-      5. synthesise_batch() sends clusters to Haiku for one briefing each
-      6. Store one row per cluster in story_clusters
-      7. Store individual source articles in cluster_sources
+      5. synthesise_cluster() sends each cluster to Haiku for one briefing,
+         stored immediately (one row in story_clusters, one row per
+         source in cluster_sources) so a later failure doesn't discard
+         already-synthesised clusters
       8. finish_cron_run() with token usage
       9. cleanup_old_articles() — 7-day TTL
     """
@@ -167,20 +175,28 @@ def run_cron():
             clusters = cluster_articles(haiku_queue)
             print(f"Grouped {len(haiku_queue)} articles into {len(clusters)} clusters")
 
-            # Step 5 — Synthesise each cluster into one briefing
-            print("\n--- Running Haiku synthesis ---")
-            synthesised = synthesise_batch(clusters)
-
-            # Step 6 + 7 — Store one row per cluster, one row per source
-            print("\n--- Storing clusters and sources ---")
-            for cluster in synthesised:
-                sources = cluster['sources']
+            # Step 5, 6, 7 — Synthesise and store each cluster immediately.
+            # Each cluster is wrapped in its own try/except so one bad
+            # cluster (Haiku error, DB write failure) never discards
+            # already-paid-for synthesis work on earlier clusters
+            # in this run — see classifier_agent.synthesise_cluster()
+            print("\n--- Running Haiku synthesis + storing clusters ---")
+            for i, cluster in enumerate(clusters):
+                lead_title = cluster[0].get('title', '')[:60]
+                print(f"Synthesising cluster {i+1}/{len(clusters)} "
+                      f"({len(cluster)} sources): {lead_title}")
                 try:
-                    top_score = max(s.get('keyword_score', 0) for s in sources)
+                    synthesis = synthesise_cluster(cluster)
+
+                    if synthesis['is_noise']:
+                        print(f"  -> NOISE — skipping")
+                        continue
+
+                    top_score = max(s.get('keyword_score', 0) for s in cluster)
                     cluster_row = {
-                        'tab': cluster['tab'],
-                        'category': cluster.get('category', ''),
-                        'briefing': cluster.get('briefing', ''),
+                        'tab': synthesis['tab'],
+                        'category': synthesis.get('category', ''),
+                        'briefing': synthesis.get('briefing', ''),
                         'keyword_score': top_score,
                         'cron_run_id': run_id,
                         'is_borderline': False,
@@ -188,7 +204,7 @@ def run_cron():
                     stored_cluster = insert_story_cluster(cluster_row)
                     cluster_id = stored_cluster['id']
 
-                    for source in sources:
+                    for source in cluster:
                         insert_url_hash(source['url_hash'])
                         insert_cluster_source({
                             'cluster_id': cluster_id,
@@ -201,12 +217,13 @@ def run_cron():
                             'clean_body': source.get('clean_body', ''),
                         })
 
-                    articles_stored += len(sources)
-                    print(f"CLUSTER STORED [{cluster['tab']}] "
-                          f"({len(sources)} sources): {cluster.get('category', '')}")
+                    synthesis['sources'] = cluster
+                    synthesised.append(synthesis)
+                    articles_stored += len(cluster)
+                    print(f"  -> {synthesis['tab']} | {synthesis['briefing'][:60]}")
                 except Exception as e:
-                    articles_dropped += len(sources)
-                    print(f"CLUSTER STORE ERROR: {e}")
+                    articles_dropped += len(cluster)
+                    print(f"CLUSTER SYNTH/STORE ERROR: {e}")
         else:
             print("\nNo articles for Haiku this run")
 

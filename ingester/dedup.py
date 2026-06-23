@@ -3,7 +3,7 @@ from simhash import Simhash
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-CLUSTER_SIMILARITY_THRESHOLD = 0.5
+CLUSTER_SIMILARITY_THRESHOLD = 0.35
 MAX_CLUSTER_SIZE = 5
 
 
@@ -132,8 +132,8 @@ def cluster_articles(
     cluster can contain articles that aren't all pairwise similar as
     long as they're chained together by shared neighbours.
 
-    similarity >= 0.5  → same story, grouped
-    similarity < 0.5   → different story, stays in its own cluster
+    similarity >= 0.35  → same story, grouped
+    similarity < 0.35   → different story, stays in its own cluster
 
     Clusters larger than max_cluster_size keep only the top N articles
     by keyword_score (highest first).

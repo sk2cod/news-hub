@@ -129,12 +129,12 @@ def classify_batch(articles: list) -> list:
         classification = classify_article(article['structured_input'])
 
         if classification['is_noise']:
-            print(f"  → NOISE — skipping")
+            print(f"  -> NOISE — skipping")
             continue
 
         article.update(classification)
         results.append(article)
-        print(f"  → {classification['tab']} | {classification['summary'][:60]}")
+        print(f"  -> {classification['tab']} | {classification['summary'][:60]}")
 
     return results
 
@@ -246,28 +246,3 @@ def synthesise_cluster(cluster: list) -> dict:
         }
 
 
-def synthesise_batch(clusters: list) -> list:
-    """
-    Synthesise a list of clusters, each a list of 1-5 article dicts
-    covering the same story (see ingester.dedup.cluster_articles).
-
-    Returns a list of dicts, one per non-noise cluster, with:
-        tab, category, briefing, is_noise, is_australia, is_nsw, sources
-    'sources' is the original list of article dicts in that cluster.
-    """
-    results = []
-    for i, cluster in enumerate(clusters):
-        lead_title = cluster[0].get('title', '')[:60]
-        print(f"Synthesising cluster {i+1}/{len(clusters)} "
-              f"({len(cluster)} sources): {lead_title}")
-        synthesis = synthesise_cluster(cluster)
-
-        if synthesis['is_noise']:
-            print(f"  → NOISE — skipping")
-            continue
-
-        synthesis['sources'] = cluster
-        results.append(synthesis)
-        print(f"  → {synthesis['tab']} | {synthesis['briefing'][:60]}")
-
-    return results
