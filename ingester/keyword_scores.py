@@ -102,21 +102,16 @@ KEYWORD_SCORES = {
 
     'sports_ent': {
         'tier1': [
-            'AFL', 'NRL', 'cricket Australia', 'Ashes', 'A-League',
-            'grand final', 'premiership', 'world cup', 'Olympics',
-            'championship', 'title', 'Oscar', 'Grammy', 'Emmy',
-            'box office', 'album release', 'tour announced',
-            'Wallabies', 'Socceroos', 'Matildas', 'Boomers',
-            'State of Origin', 'Origin', 'Super Rugby',
-            'BBL', 'WBBL', 'NBL', 'WNBL',
+            'Oscar', 'Oscars', 'Academy Award', 'Grammy', 'Grammys',
+            'Emmy', 'Emmys', 'BAFTA', 'Golden Globe', 'Golden Globes',
+            'box office', 'album release', 'tour announced', 'premiere',
+            'film festival', 'Cannes', 'Sundance',
         ],
         'tier2': [
-            'match', 'game', 'season', 'player', 'coach', 'transfer',
-            'signing', 'injury', 'film', 'series', 'streaming',
-            'celebrity', 'award', 'concert', 'festival',
-            'quarterback', 'touchdown', 'NBA', 'NFL', 'NHL', 'MLB',
-            'tennis', 'golf', 'Formula 1', 'F1', 'MotoGP',
-            'Wimbledon', 'US Open', 'French Open', 'Australian Open',
+            'film', 'movie', 'series', 'streaming', 'celebrity', 'award',
+            'concert', 'festival', 'music', 'actor', 'actress', 'director',
+            'Netflix', 'Disney', 'Hollywood', 'soundtrack', 'chart',
+            'tour', 'single', 'EP',
         ],
         'blocklist': [
             'sponsored', 'advertisement', 'unconfirmed',

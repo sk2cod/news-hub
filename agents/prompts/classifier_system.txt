@@ -11,7 +11,7 @@ Your job is to classify and summarise news articles.
 
 4. ai_tech - ONLY major AI and technology developments. New frontier model releases, AI regulation and policy, significant research papers, large funding rounds (>$100M), documented AI deployments or failures with measurable impact, semiconductor and compute infrastructure.
 
-5. sports_ent - A leisure digest for a casual reader, not a specialist follower. Sports results and entertainment industry news at a broad cultural level.
+5. sports_ent - A leisure digest for a casual reader, not a specialist follower. Entertainment industry news at a broad cultural level — film, music, awards, celebrity culture. No sports.
 
 6. australia - News primarily about Australia at national or NSW/Sydney level. Australian politics, RBA decisions, Australian disasters, NSW government, Sydney-specific news.
 
@@ -21,18 +21,11 @@ Your job is to classify and summarise news articles.
 - If a story fits multiple tabs, use this priority order: australia > ai_tech > geopolitics > finance > top_stories > sports_ent
 - Australian stories about finance still go to australia tab.
 - AI regulation stories go to ai_tech not geopolitics.
-- Australian sports stories (AFL, NRL, Socceroos, Wallabies, Matildas) go to australia tab not sports_ent.
+- sports_ent is entertainment ONLY — no sports of any kind. Sports stories are not relevant to this news hub; mark them is_noise=true regardless of which tab they'd otherwise fit, except Australian national-level sport results, which go to the australia tab.
 
-## SPORTS & ENTERTAINMENT FILTER RULES
+## ENTERTAINMENT FILTER RULES
 
-The test for every sports_ent article: "Would someone who doesn't closely follow this sport or celebrity still find this interesting or worth knowing?"
-
-KEEP for sports:
-- Final results and standings from major tournaments and championships
-- Formula 1, MotoGP, Cricket, Tennis Grand Slams, FIFA World Cup, NRL, AFL, Rugby Union, Olympics - scores and key highlights
-- Deaths, lifetime bans, or major scandals involving globally recognised athletes
-- Stories with geopolitical or cultural significance beyond the sport itself
-- Australian sport results at national level - NRL, AFL, Socceroos, Wallabies, Matildas, Cricket Australia
+The test for every sports_ent article: "Would someone who doesn't closely follow this celebrity or franchise still find this interesting or worth knowing?"
 
 KEEP for entertainment:
 - Major film or TV releases from globally recognised directors or franchises
@@ -40,16 +33,6 @@ KEEP for entertainment:
 - Music chart milestones or record-breaking tours from global artists
 - Industry-level news that affects content audiences watch or listen to
 - Cultural moments with broad global relevance
-
-MARK AS NOISE for sports:
-- Regular season game recaps for NHL, MLB, NBA (non-finals)
-- US college sports - NCAA, Big 12, college football rankings
-- Player contract negotiations, lawsuits, or agent disputes unless globally significant
-- Coach or manager press conference quotes with no news event
-- Fantasy sports, betting odds, or draft analysis
-- Training camp updates or pre-season speculation
-- Transfer rumours with words: could, might, reportedly considering
-- Sport-specific statistics breakdowns for non-major events
 
 MARK AS NOISE for entertainment:
 - Celebrity relationship gossip, breakups, dating rumours

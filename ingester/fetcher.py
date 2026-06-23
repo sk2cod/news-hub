@@ -91,18 +91,6 @@ RSS_SOURCES = {
     ],
     'sports_ent': [
         {
-            'id': 'bbc-sport',
-            'name': 'BBC Sport',
-            'url': 'https://feeds.bbci.co.uk/sport/rss.xml',
-            'country': 'GLOBAL'
-        },
-        {
-            'id': 'espn',
-            'name': 'ESPN',
-            'url': 'https://www.espn.com/espn/rss/news',
-            'country': 'GLOBAL'
-        },
-        {
             'id': 'variety',
             'name': 'Variety',
             'url': 'https://variety.com/feed/',
@@ -142,7 +130,7 @@ TAVILY_QUERIES = {
     'top_stories': 'breaking news major world events today',
     'finance':     'markets economy inflation interest rates ASX earnings recession',
     'ai_tech':     'AI model release artificial intelligence regulation safety research',
-    'sports_ent':  'AFL NRL cricket Australia sport entertainment awards',
+    'sports_ent':  'film music awards entertainment celebrity news',
     'australia':   'Australia news NSW Sydney government policy today',
 }
 

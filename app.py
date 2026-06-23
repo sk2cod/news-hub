@@ -68,13 +68,13 @@ st.divider()
 # ─── Tab definitions ──────────────────────────────────────────────────────────
 
 TABS = {
-    '🌍 Geopolitics':  'geopolitics',
-    '📰 Top Stories':  'top_stories',
-    '💹 Finance':      'finance',
-    '🤖 AI & Tech':    'ai_tech',
-    '🏆 Sports & Ent': 'sports_ent',
-    '🇦🇺 Australia':   'australia',
-    '⚠️ Borderline':   'borderline',
+    '🌍 Geopolitics':   'geopolitics',
+    '📰 Top Stories':   'top_stories',
+    '💹 Finance':       'finance',
+    '🤖 AI & Tech':     'ai_tech',
+    '🏆 Entertainment': 'sports_ent',
+    '🇦🇺 Australia':    'australia',
+    '⚠️ Borderline':    'borderline',
 }
 
 TAB_LABELS = {
@@ -82,7 +82,7 @@ TAB_LABELS = {
     'top_stories': '📰 Top Stories',
     'finance':     '💹 Finance',
     'ai_tech':     '🤖 AI & Tech',
-    'sports_ent':  '🏆 Sports & Ent',
+    'sports_ent':  '🏆 Entertainment',
     'australia':   '🇦🇺 Australia',
 }
 
